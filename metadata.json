@@ -1,0 +1,6 @@
+{
+  "name": "AI Video Studio",
+  "description": "Comprehensive AI Video Platform featuring text-to-video generation, video understanding with Gemini 4 Argon, audio transcription with Gemini 3.5 Transcribe, dynamic subtitle styling, and full-stack video rendering pipeline.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
