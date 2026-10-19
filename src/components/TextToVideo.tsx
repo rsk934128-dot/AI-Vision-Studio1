@@ -14,15 +14,22 @@ import {
   Clock, 
   FileText,
   AlertCircle,
-  Loader2
+  Loader2,
+  Music,
+  ArrowRight,
+  Youtube
 } from 'lucide-react';
-import { Language, VideoScript, VideoJob } from '../types';
+import { Language, VideoScript, VideoJob, StudioTab } from '../types';
+import { GenerativeVideoPlayer } from './GenerativeVideoPlayer';
+import { YouTubeUploadModal } from './YouTubeUploadModal';
 
 interface TextToVideoProps {
   lang: Language;
   onJobCreated?: (job: VideoJob) => void;
   presetSrt?: string;
+  onNavigateTab?: (tab: StudioTab) => void;
 }
+
 
 const STYLE_PRESETS = [
   { id: 'cinematic', labelBn: 'সিনেমাটিক ৮কে (Cinematic 8K)', labelEn: 'Cinematic 8K', icon: '🎬' },
@@ -33,7 +40,7 @@ const STYLE_PRESETS = [
   { id: 'claymation', labelBn: 'ক্লে-অ্যানিমেশন (Claymation)', labelEn: 'Claymation Art', icon: '🎨' },
 ];
 
-export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, presetSrt }) => {
+export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, presetSrt, onNavigateTab }) => {
   const isBn = lang === 'bn';
 
   const [prompt, setPrompt] = useState<string>(
@@ -52,6 +59,7 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
   const [activeJob, setActiveJob] = useState<VideoJob | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [apiKeyNotice, setApiKeyNotice] = useState<string | null>(null);
+  const [showYouTubeModal, setShowYouTubeModal] = useState<boolean>(false);
 
   // Generate Script using Gemini 3.8 Flash
   const handleGenerateScript = async () => {
@@ -91,6 +99,33 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
     setIsRendering(true);
     setErrorMsg(null);
 
+    let currentScenes = generatedScript?.scenes;
+    let currentVoiceover = generatedScript?.fullVoiceoverText;
+
+    // If script not generated yet, generate one first so custom scenes match prompt
+    if (!currentScenes || currentScenes.length === 0) {
+      try {
+        const scriptRes = await fetch('/api/generate-script', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: prompt,
+            duration,
+            language: isBn ? 'Bengali with catchy modern tone' : 'English with viral retention hook',
+            style: selectedStyle,
+          }),
+        });
+        const scriptData = await scriptRes.json();
+        if (scriptData.script) {
+          setGeneratedScript(scriptData.script);
+          currentScenes = scriptData.script.scenes;
+          currentVoiceover = scriptData.script.fullVoiceoverText;
+        }
+      } catch (_e) {
+        // proceed with render
+      }
+    }
+
     try {
       const res = await fetch('/api/jobs', {
         method: 'POST',
@@ -99,8 +134,9 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
           prompt,
           style: selectedStyle,
           aspectRatio,
-          voiceoverText: generatedScript?.fullVoiceoverText,
+          voiceoverText: currentVoiceover,
           customSrt: presetSrt,
+          scenes: currentScenes,
         }),
       });
 
@@ -124,7 +160,7 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
               setIsRendering(false);
             }
           }
-        } catch (e) {
+        } catch (_e) {
           clearInterval(pollInterval);
           setIsRendering(false);
         }
@@ -135,6 +171,7 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
       setIsRendering(false);
     }
   };
+
 
   return (
     <div className="space-y-8">
@@ -202,10 +239,60 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
                 placeholder={isBn ? 'আপনার ভিডিওর আইডিয়া লিখুন...' : 'Describe what you want to see in the video...'}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition resize-none"
               />
+
+              {/* Instant Prompt Idea Chips */}
+              <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                <span className="text-[10px] text-slate-400 font-semibold">{isBn ? 'আইডিয়া টেমপ্লেট:' : 'Quick Ideas:'}</span>
+                {[
+                  { labelBn: '🐱 কিউট বিড়াল দুধ খাচ্ছে', labelEn: '🐱 Cute Kitten Drinking Milk', text: 'একটি মিষ্টি কিউট বিড়ালছানা ঘরের নরম আলোয় বাটি থেকে দুধ খাচ্ছে এবং মিষ্টি দুষ্টুমি করছে।' },
+                  { labelBn: '🎵 মডেলের রোমান্টিক মিউজিক ভিডিও', labelEn: '🎵 Model Music Video', text: 'ছেলে ও মেয়ে মডেলের ছবি দিয়ে কক্সবাজারের সমুদ্র সৈকতে রোমান্টিক গানের মিউজিক ভিডিও তৈরি করুন।' },
+                  { labelBn: '🍳 বিরিয়ানি রান্নার রেসিপি', labelEn: '🍳 Delicious Biryani Recipe', text: 'সুস্বাদু বিরিয়ানি রান্নার স্পেশাল রেসিপি, গরম প্যানে মশলার সুবাস আর লোভনীয় গ্রেভির সিনেমাটিক দৃশ্য।' },
+                  { labelBn: '🏎️ বৃষ্টিতে সুপারকার রেসিং', labelEn: '🏎️ Supercar Drift in Rain', text: 'মধ্যরাতে বৃষ্টিভেজা রাস্তায় নিয়ন লাইটের নিচে তীব্র গতিতে ড্রিফটিং করছে একটি সুপারকার।' },
+                  { labelBn: '🌿 পাহাড় ও নদীর প্রকৃতি', labelEn: '🌿 Mountains & River Nature', text: 'ভোরের কুয়াশাচ্ছন্ন সবুজ পাহাড়ের ওপর দিয়ে ড্রোন ফ্লাইট, স্বচ্ছ নদী ও পাখির কিচিরমিচির।' },
+                  { labelBn: '🕌 ইসলামিক মসজিদ গোধূলি', labelEn: '🕌 Mosque Golden Twilight', text: 'সোনালী গোধূলিতে সাদা মার্বেলের মসজিদের গম্বুজ, স্নিগ্ধ চাঁদের আলো এবং অন্তরের গভীর প্রশান্তি।' },
+                  { labelBn: '🚀 মহাকাশ ও মঙ্গল রোভার', labelEn: '🚀 Mars Rover Space Exploration', text: 'একটি মহাকাশচারী মঙ্গল গ্রহের লাল বালুকাময় প্রান্তরে হাঁটছে, চারপাশে নিয়ন আলো আর উড়ন্ত ড্রোন।' },
+                ].map((preset, pIdx) => (
+                  <button
+                    key={pIdx}
+                    type="button"
+                    onClick={() => {
+                      setPrompt(preset.text);
+                      setGeneratedScript(null);
+                      setActiveJob(null);
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-slate-950/80 hover:bg-cyan-950 text-[10px] text-slate-300 hover:text-cyan-300 border border-slate-800 transition"
+                  >
+                    {isBn ? preset.labelBn : preset.labelEn}
+                  </button>
+                ))}
+              </div>
+
+              {/* Smart Music Video Recommendation Banner */}
+              {/গান|মিউজিক|মডেল|ছেলে|মেয়ে|ছবি|photo|model|music|song/i.test(prompt) && onNavigateTab && (
+                <div className="mt-3 p-3 bg-gradient-to-r from-pink-950/60 to-purple-950/60 border border-pink-700/60 rounded-xl flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Music className="w-4 h-4 text-pink-400 shrink-0" />
+                    <span className="text-pink-200">
+                      {isBn 
+                        ? 'ছবি আপলোড করে মডেলের মিউজিক ভিডিও তৈরি করতে চান?' 
+                        : 'Want to generate a music video with custom model photos & songs?'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('photo-music-video')}
+                    className="px-3 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-500 text-white font-bold text-[11px] flex items-center gap-1 shadow shrink-0"
+                  >
+                    <span>{isBn ? 'ছবি-টু-মিউজিক ভিডিও স্টুডিওতে যান' : 'Go to Photo Music Video'}</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Aspect Ratio Switcher */}
             <div>
+
               <label className="block text-xs font-bold text-slate-300 mb-2">
                 {isBn ? 'অ্যাসপেক্ট রেশিও (Aspect Ratio):' : 'Aspect Ratio Format:'}
               </label>
@@ -399,85 +486,93 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
               )}
             </div>
 
-            {/* Canvas Video Viewport */}
-            <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center transition-all duration-300 ${
-              aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
-            }`}>
-              
+            {/* Canvas Video Viewport & Generative Player */}
+            <div className="w-full">
               {isRendering ? (
-                <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 z-20">
+                <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center space-y-3 transition-all duration-300 ${
+                  aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
+                }`}>
                   <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 animate-spin">
                     <Loader2 className="w-6 h-6" />
                   </div>
                   <p className="text-xs font-bold text-white">
-                    {isBn ? 'ভিডিও ক্লিপ ও অডিও রেন্ডার হচ্ছে...' : 'FFmpeg Concat & Subtitle Engine Running...'}
+                    {isBn ? 'প্রম্পট অনুযায়ী দৃশ্য ও অডিও সিন্থেসিস হচ্ছে...' : 'Synthesizing Custom Scene Frames & Subtitles...'}
                   </p>
                   {/* Progress Bar */}
                   <div className="w-48 bg-slate-800 h-2 rounded-full overflow-hidden">
                     <div 
                       className="bg-gradient-to-r from-cyan-400 to-indigo-500 h-full transition-all duration-500"
-                      style={{ width: `${activeJob?.progress || 35}%` }} 
+                      style={{ width: `${activeJob?.progress || 40}%` }} 
                     />
                   </div>
                   <span className="text-[10px] text-cyan-400 font-mono">
-                    {activeJob?.progress || 35}% Processed
+                    {activeJob?.progress || 40}% Processed
                   </span>
                 </div>
-              ) : activeJob?.videoUrl ? (
-                <div className="relative w-full h-full">
-                  <video
-                    src={activeJob.videoUrl}
-                    controls
-                    autoPlay
-                    loop
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Overlay stylish subtitle simulation */}
-                  <div className="absolute bottom-6 inset-x-4 text-center pointer-events-none">
-                    <span 
-                      style={{ 
-                        color: '#00ffff',
-                        textShadow: '2px 2px 4px #000000, -2px -2px 4px #000000',
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        letterSpacing: '0.5px'
-                      }}
-                      className="px-3 py-1 bg-black/40 backdrop-blur-sm rounded-lg"
-                    >
-                      {activeJob.srtContent ? activeJob.srtContent.split('\n')[2] || 'এআই ভিডিও স্টুডিও রেন্ডার সফল!' : 'AI Generated Video Ready!'}
-                    </span>
-                  </div>
-                </div>
+              ) : (activeJob || generatedScript) ? (
+                <GenerativeVideoPlayer
+                  job={activeJob}
+                  script={generatedScript}
+                  aspectRatio={aspectRatio}
+                  lang={lang}
+                />
               ) : (
-                <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-2">
-                  <Play className="w-10 h-10 opacity-30 text-cyan-400" />
-                  <p className="text-xs font-medium text-slate-400">
-                    {isBn ? 'ভিডিও তৈরি করতে বামদিকের বাটনে ক্লিক করুন।' : 'Ready to synthesize video. Click Generate Video on the left.'}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {isBn ? 'সাপোর্টেড ফরম্যাট: ১৬:৯ ইউটিউব, ৯:১৬ শর্টস ও রিলস' : 'Supports 16:9 Landscape & 9:16 Shorts/Reels with Subtitles'}
-                  </p>
+                <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-3 transition-all duration-300 ${
+                  aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
+                }`}>
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                    <Play className="w-6 h-6 fill-current" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-200">
+                      {isBn ? 'আপনার পছন্দের যেকোনো ভিডিও তৈরি করুন' : 'AI Video Synthesizer Ready'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 max-w-xs mt-1">
+                      {isBn 
+                        ? 'বিড়াল/পোষা প্রাণী, রান্না, রেসিং কার, শান্ত নদী-পাহাড়, ইসলামিক দৃশ্য বা টেক টিউটোরিয়াল—যেকোনো প্রম্পট দিলেই নিখুঁত ভিডিও তৈরি হবে।' 
+                        : 'Accurately synthesizes scenes matching any prompt with subtitles, voiceover and export.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleStartRender}
+                    disabled={!prompt.trim()}
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-md shadow-cyan-600/30 flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{isBn ? 'এখনই তৈরি করুন' : 'Generate Now'}</span>
+                  </button>
                 </div>
               )}
-
             </div>
 
+
             {/* Download / Export Bar when Video is ready */}
-            {activeJob?.videoUrl && (
-              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+            {activeJob && (
+              <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-slate-400">
                   {isBn ? 'রেডি ফর পাবলিশিং (1080p MP4)' : 'Ready for YouTube & TikTok Export'}
                 </span>
-                <a
-                  href={activeJob.videoUrl}
-                  download="ai_studio_render.mp4"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/20 transition"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{isBn ? 'ভিডিও ডাউনলোড করুন' : 'Download MP4'}</span>
-                </a>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowYouTubeModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-md shadow-red-600/20 transition cursor-pointer"
+                  >
+                    <Youtube className="w-3.5 h-3.5" />
+                    <span>{isBn ? 'ইউটিউবে আপলোড' : 'Publish to YouTube'}</span>
+                  </button>
+                  {activeJob.videoUrl && (
+                    <a
+                      href={activeJob.videoUrl}
+                      download="ai_studio_render.mp4"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/20 transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isBn ? 'ডাউনলোড' : 'Download'}</span>
+                    </a>
+                  )}
+                </div>
               </div>
             )}
 
@@ -500,6 +595,19 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
         </div>
 
       </div>
+
+      {/* YouTube Upload Modal */}
+      {showYouTubeModal && (
+        <YouTubeUploadModal
+          isOpen={showYouTubeModal}
+          onClose={() => setShowYouTubeModal(false)}
+          lang={lang}
+          initialTitle={generatedScript?.title || prompt.slice(0, 60)}
+          initialDescription={`${generatedScript?.fullVoiceoverText || prompt}\n\nGenerated with AI Video Studio Bangladesh.\n#AIVideo #Shorts #GenerativeAI`}
+          initialTags={generatedScript?.recommendedTags || ['AIVideo', 'Shorts', 'AIStudio']}
+          videoUrl={activeJob?.videoUrl}
+        />
+      )}
     </div>
   );
 };

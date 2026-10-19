@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, 
   Upload, 
@@ -14,13 +14,16 @@ import {
   Camera,
   AlertCircle,
   FileVideo,
-  Cpu
+  Cpu,
+  Sliders
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, VideoUnderstandingMetadata } from '../types';
+import { VideoMetadataSidebar } from './VideoMetadataSidebar';
 
 interface VideoUnderstandingProps {
   lang: Language;
 }
+
 
 interface SampleVideo {
   titleBn: string;
@@ -65,12 +68,16 @@ const SAMPLE_VIDEOS: SampleVideo[] = [
 export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) => {
   const isBn = lang === 'bn';
 
-  const [selectedModel, setSelectedModel] = useState<'gemini-3.8-flash' | 'gemini-4-argon'>('gemini-3.8-flash');
-  const [modelUsed, setModelUsed] = useState<string>('gemini-3.8-flash');
+  const [selectedModel, setSelectedModel] = useState<'gemini-3.8-flash' | 'gemini-4-argon'>('gemini-4-argon');
+  const [modelUsed, setModelUsed] = useState<string>('gemini-4-argon');
   const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>(SAMPLE_VIDEOS[0].url);
   const [videoTitle, setVideoTitle] = useState<string>(SAMPLE_VIDEOS[0].titleEn);
   const [userPrompt, setUserPrompt] = useState<string>(SAMPLE_VIDEOS[0].defaultPrompt);
   const [loading, setLoading] = useState<boolean>(false);
+  const [metadataLoading, setMetadataLoading] = useState<boolean>(false);
+  const [metadata, setMetadata] = useState<VideoUnderstandingMetadata | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [currentTime, setCurrentTime] = useState<number>(0);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
   const [activePreset, setActivePreset] = useState<string>('all');
@@ -78,6 +85,34 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Fetch structured metadata powered by Gemini 4 Argon
+  const fetchMetadata = async (title = videoTitle, prompt = userPrompt) => {
+    setMetadataLoading(true);
+    try {
+      const res = await fetch('/api/video-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoTitle: title,
+          prompt,
+          model: 'gemini-4-argon',
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.metadata) {
+        setMetadata(data.metadata);
+      }
+    } catch (_err) {
+      console.warn('Failed to load video metadata');
+    } finally {
+      setMetadataLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMetadata(SAMPLE_VIDEOS[0].titleEn, SAMPLE_VIDEOS[0].defaultPrompt);
+  }, []);
 
   const quickPresets = [
     {
@@ -108,10 +143,12 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
 
   const handleSelectSample = (sample: SampleVideo) => {
     setSelectedVideoUrl(sample.url);
-    setVideoTitle(isBn ? sample.titleBn : sample.titleEn);
+    const title = isBn ? sample.titleBn : sample.titleEn;
+    setVideoTitle(title);
     setUserPrompt(sample.defaultPrompt);
     setAnalysisResult(null);
     setErrorMsg(null);
+    fetchMetadata(title, sample.defaultPrompt);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,13 +165,20 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
     setVideoTitle(file.name);
     setAnalysisResult(null);
     setErrorMsg(null);
+    fetchMetadata(file.name, userPrompt);
+  };
+
+  const handleSeek = (seconds: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = seconds;
+      videoRef.current.play().catch(() => {});
+    }
   };
 
   const handleAnalyze = async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Call server endpoint
       const res = await fetch('/api/analyze-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,6 +197,9 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
         if (data.modelUsed) {
           setModelUsed(data.modelUsed);
         }
+        if (data.metadata) {
+          setMetadata(data.metadata);
+        }
       } else if (!res.ok || !data.success) {
         setErrorMsg(data.error || 'Failed to analyze video');
       }
@@ -170,6 +217,7 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
 
   return (
     <div className="space-y-8">
@@ -198,6 +246,23 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition border ${
+                isSidebarOpen
+                  ? 'bg-purple-950 text-purple-300 border-purple-700 shadow-lg shadow-purple-950/40'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              <Sliders className="w-4 h-4 text-purple-400" />
+              <span>{isBn ? 'মেটাডাটা সাইডবার' : 'Metadata Sidebar'}</span>
+              {metadata && (
+                <span className="px-1.5 py-0.2 rounded-full bg-purple-900 text-purple-200 text-[10px] font-mono">
+                  {metadata.detectedObjects.length} Objs
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs font-semibold transition"
             >
@@ -215,32 +280,38 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
         </div>
       </div>
 
-      {/* Main Grid: Left = Video Player & Samples, Right = Prompt & Gemini 4 Argon Output */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Main Container with Metadata Sidebar */}
+      <div className="flex flex-col lg:flex-row items-start gap-6">
         
-        {/* Left Column: Video Preview & Sample Selector (5 cols) */}
-        <div className="lg:col-span-5 space-y-5">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Film className="w-3.5 h-3.5 text-cyan-400" />
-                {videoTitle}
-              </span>
-              <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
-                Preview Player
-              </span>
-            </div>
+        {/* Left & Center Main Content Area */}
+        <div className="flex-1 w-full space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Left Column: Video Preview & Sample Selector (5 cols) */}
+            <div className="lg:col-span-5 space-y-5">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <Film className="w-3.5 h-3.5 text-cyan-400" />
+                    {videoTitle}
+                  </span>
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
+                    Preview Player
+                  </span>
+                </div>
 
-            {/* Video Player Box */}
-            <div className="relative rounded-xl overflow-hidden bg-black aspect-video border border-slate-800 group shadow-inner">
-              <video
-                ref={videoRef}
-                src={selectedVideoUrl}
-                controls
-                playsInline
-                className="w-full h-full object-contain"
-              />
-            </div>
+                {/* Video Player Box with time tracking */}
+                <div className="relative rounded-xl overflow-hidden bg-black aspect-video border border-slate-800 group shadow-inner">
+                  <video
+                    ref={videoRef}
+                    src={selectedVideoUrl}
+                    controls
+                    playsInline
+                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+
 
             {/* Video Info Badges */}
             <div className="grid grid-cols-3 gap-2 mt-4 text-center">
@@ -473,5 +544,20 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
 
       </div>
     </div>
-  );
+
+    {/* Gemini 4 Argon Video Metadata Sidebar */}
+    <VideoMetadataSidebar
+      metadata={metadata}
+      loading={metadataLoading}
+      lang={lang}
+      currentTime={currentTime}
+      onSeek={handleSeek}
+      onScanWithGeminiArgon={() => fetchMetadata(videoTitle, userPrompt)}
+      isOpen={isSidebarOpen}
+      onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+    />
+
+  </div>
+</div>
+);
 };
