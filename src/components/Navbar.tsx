@@ -15,7 +15,8 @@ import {
   Youtube,
   LogOut,
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  Smartphone
 } from 'lucide-react';
 import { StudioTab, Language } from '../types';
 import { useYouTubeAuth } from '../context/YouTubeAuthContext';
@@ -55,11 +56,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     {
       id: 'youtube-studio',
-      labelBn: 'ইউটিউব স্টুডিও',
-      labelEn: 'YouTube Studio',
+      labelBn: 'ইউটিউব ওয়াচ ও স্টুডিও',
+      labelEn: 'YouTube Watch & Studio',
       icon: <Youtube className="w-4 h-4 text-red-500" />,
-      badge: isAuthenticated ? 'Connected' : 'OAuth',
-      badgeColor: isAuthenticated ? 'bg-red-950 text-red-400 border-red-800' : 'bg-slate-800 text-slate-400 border-slate-700'
+      badge: isAuthenticated ? 'Connected' : 'Watch & Hub',
+      badgeColor: isAuthenticated ? 'bg-red-950 text-red-400 border-red-800' : 'bg-red-950/40 text-red-400 border-red-800/60'
     },
     {
       id: 'video-understanding',
@@ -93,6 +94,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       labelEn: 'shurjoPay & Gmail',
       icon: <CreditCard className="w-4 h-4" />,
       badge: 'Fintech'
+    },
+    {
+      id: 'android-builder',
+      labelBn: 'অ্যান্ড্রয়েড APK ও গিটহাব',
+      labelEn: 'Android APK & GitHub',
+      icon: <Smartphone className="w-4 h-4 text-emerald-400" />,
+      badge: 'APK & AAB',
+      badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800'
     },
     {
       id: 'admin',

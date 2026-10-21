@@ -15,6 +15,7 @@ import { SubtitleEngine } from './components/SubtitleEngine';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ShurjoPayHub } from './components/ShurjoPayHub';
 import { YouTubeStudio } from './components/YouTubeStudio';
+import { AndroidGitHubBuilder } from './components/AndroidGitHubBuilder';
 import { YouTubeAuthProvider } from './context/YouTubeAuthContext';
 import { Sparkles, Video, Search, Mic, Layers, Subtitles, ShieldCheck, Youtube } from 'lucide-react';
 
@@ -95,6 +96,10 @@ export default function App() {
 
           {activeTab === 'shurjopay-gmail' && (
             <ShurjoPayHub lang={lang} />
+          )}
+
+          {activeTab === 'android-builder' && (
+            <AndroidGitHubBuilder lang={lang} />
           )}
 
           {activeTab === 'admin' && (

@@ -9,6 +9,7 @@ export type StudioTab =
   | 'subtitles'
   | 'shurjopay-gmail'
   | 'youtube-studio'
+  | 'android-builder'
   | 'admin';
 
 export interface ModelProfile {

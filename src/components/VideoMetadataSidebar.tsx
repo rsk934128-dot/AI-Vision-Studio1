@@ -28,6 +28,8 @@ interface VideoMetadataSidebarProps {
   onScanWithGeminiArgon: () => void;
   isOpen: boolean;
   onToggle: () => void;
+  isUploaded?: boolean;
+  fileSize?: string;
 }
 
 export const VideoMetadataSidebar: React.FC<VideoMetadataSidebarProps> = ({
@@ -38,24 +40,38 @@ export const VideoMetadataSidebar: React.FC<VideoMetadataSidebarProps> = ({
   onSeek,
   onScanWithGeminiArgon,
   isOpen,
-  onToggle
+  onToggle,
+  isUploaded = false,
+  fileSize
 }) => {
   const isBn = lang === 'bn';
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'objects' | 'scenes' | 'specs'>('scenes');
+  const [activeTab, setActiveTab] = useState<'scenes' | 'objects' | 'specs'>('scenes');
+  const [copiedJson, setCopiedJson] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const handleCopyJson = () => {
+    if (!metadata) return;
+    navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
+    setCopiedJson(true);
+    setTimeout(() => setCopiedJson(false), 2000);
+  };
 
   const categories = [
     { id: 'all', labelBn: 'সকল', labelEn: 'All' },
+    { id: 'Entity', labelBn: 'প্রাণী/চরিত্র', labelEn: 'Entity' },
     { id: 'Vehicle', labelBn: 'যানবাহন', labelEn: 'Vehicle' },
     { id: 'Environment', labelBn: 'পরিবেশ', labelEn: 'Environment' },
     { id: 'Technology', labelBn: 'প্রযুক্তি', labelEn: 'Technology' },
-    { id: 'Entity', labelBn: 'প্রাণী/চরিত্র', labelEn: 'Entity' },
     { id: 'Nature', labelBn: 'প্রকৃতি', labelEn: 'Nature' },
   ];
 
   const filteredObjects = (metadata?.detectedObjects || []).filter((obj) => {
-    if (activeCategory === 'all') return true;
-    return obj.category === activeCategory;
+    const matchesCat = activeCategory === 'all' || obj.category === activeCategory;
+    const matchesSearch = !searchQuery || 
+      obj.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (obj.nameBn && obj.nameBn.includes(searchQuery));
+    return matchesCat && matchesSearch;
   });
 
   const parseTimestampToSeconds = (ts: string): number => {
@@ -124,6 +140,30 @@ export const VideoMetadataSidebar: React.FC<VideoMetadataSidebarProps> = ({
       {isOpen && (
         <div className="flex-1 flex flex-col overflow-hidden">
           
+          {/* Active Video File Info Bar */}
+          <div className="px-3 py-2 bg-slate-950/70 border-b border-slate-800/80 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5 truncate">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isUploaded ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'}`} />
+              <span className="text-[11px] font-bold text-slate-200 truncate" title={metadata?.videoTitle}>
+                {metadata?.videoTitle || (isBn ? 'ভিডিও ফাইল' : 'Active Video')}
+              </span>
+              {isUploaded && (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 shrink-0">
+                  {isBn ? 'আপলোডকৃত' : 'Uploaded'}
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={handleCopyJson}
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+              title="Copy Gemini 4 Argon Metadata JSON"
+            >
+              <CheckCircle2 className={`w-3 h-3 ${copiedJson ? 'text-emerald-400' : 'text-slate-400'}`} />
+              <span>{copiedJson ? (isBn ? 'কপি হয়েছে' : 'Copied') : 'JSON'}</span>
+            </button>
+          </div>
+
           {/* Quick Rescan / Trigger Button */}
           <div className="p-3 bg-slate-950/40 border-b border-slate-800/60 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -135,7 +175,7 @@ export const VideoMetadataSidebar: React.FC<VideoMetadataSidebarProps> = ({
             <button
               onClick={onScanWithGeminiArgon}
               disabled={loading}
-              className="px-2.5 py-1 rounded-lg bg-purple-950/80 hover:bg-purple-900 border border-purple-700/80 text-[10px] font-bold text-purple-200 flex items-center gap-1.5 transition disabled:opacity-50"
+              className="px-2.5 py-1 rounded-lg bg-purple-950/80 hover:bg-purple-900 border border-purple-700/80 text-[10px] font-bold text-purple-200 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin text-purple-300' : ''}`} />
               <span>{loading ? (isBn ? 'স্ক্যান হচ্ছে...' : 'Scanning...') : (isBn ? 'জেমিনি ৪ স্ক্যান' : 'Rescan Argon')}</span>
@@ -297,7 +337,7 @@ export const VideoMetadataSidebar: React.FC<VideoMetadataSidebarProps> = ({
                   <button
                     key={cat.id}
                     onClick={() => setActiveCategory(cat.id)}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition ${
+                    className={`px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition cursor-pointer ${
                       activeCategory === cat.id
                         ? 'bg-purple-600 text-white'
                         : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -306,6 +346,17 @@ export const VideoMetadataSidebar: React.FC<VideoMetadataSidebarProps> = ({
                     {isBn ? cat.labelBn : cat.labelEn}
                   </button>
                 ))}
+              </div>
+
+              {/* Object Quick Search */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={isBn ? 'শনাক্তকৃত অবজেক্ট খুঁজুন...' : 'Search detected objects...'}
+                  className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                />
               </div>
 
               {/* Objects List */}

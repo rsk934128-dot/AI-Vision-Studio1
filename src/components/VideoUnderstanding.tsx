@@ -78,6 +78,11 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
   const [metadata, setMetadata] = useState<VideoUnderstandingMetadata | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [videoDuration, setVideoDuration] = useState<number | undefined>(undefined);
+  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | undefined>(undefined);
+  const [isCustomUpload, setIsCustomUpload] = useState<boolean>(false);
+  const [uploadedFileDetails, setUploadedFileDetails] = useState<{ name: string; size: string } | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
   const [activePreset, setActivePreset] = useState<string>('all');
@@ -86,8 +91,19 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   // Fetch structured metadata powered by Gemini 4 Argon
-  const fetchMetadata = async (title = videoTitle, prompt = userPrompt) => {
+  const fetchMetadata = async (
+    title = videoTitle, 
+    prompt = userPrompt,
+    duration?: number,
+    dimensions?: { width: number; height: number },
+    isUploaded?: boolean
+  ) => {
     setMetadataLoading(true);
     try {
       const res = await fetch('/api/video-metadata', {
@@ -97,6 +113,9 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
           videoTitle: title,
           prompt,
           model: 'gemini-4-argon',
+          duration: duration || videoDuration,
+          dimensions: dimensions || videoDimensions,
+          isUploaded: isUploaded !== undefined ? isUploaded : isCustomUpload
         }),
       });
       const data = await res.json();
@@ -142,30 +161,74 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
   ];
 
   const handleSelectSample = (sample: SampleVideo) => {
+    setIsCustomUpload(false);
+    setUploadedFileDetails(null);
     setSelectedVideoUrl(sample.url);
     const title = isBn ? sample.titleBn : sample.titleEn;
     setVideoTitle(title);
     setUserPrompt(sample.defaultPrompt);
     setAnalysisResult(null);
     setErrorMsg(null);
-    fetchMetadata(title, sample.defaultPrompt);
+    fetchMetadata(title, sample.defaultPrompt, undefined, undefined, false);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processVideoFile = (file: File) => {
     if (!file.type.startsWith('video/')) {
-      setErrorMsg(isBn ? 'অনুগ্রহ করে একটি সঠিক ভিডিও ফাইল নির্বাচন করুন।' : 'Please select a valid video file.');
+      setErrorMsg(isBn ? 'অনুগ্রহ করে একটি সঠিক ভিডিও ফাইল নির্বাচন করুন (MP4, WebM, MOV ইত্যাদি)।' : 'Please select a valid video file (MP4, WebM, MOV, etc.).');
       return;
     }
 
     const objectUrl = URL.createObjectURL(file);
     setSelectedVideoUrl(objectUrl);
     setVideoTitle(file.name);
+    setIsCustomUpload(true);
+    setUploadedFileDetails({
+      name: file.name,
+      size: formatFileSize(file.size)
+    });
     setAnalysisResult(null);
     setErrorMsg(null);
-    fetchMetadata(file.name, userPrompt);
+    setIsSidebarOpen(true); // Open sidebar automatically for uploaded video metadata
+    fetchMetadata(file.name, userPrompt, undefined, undefined, true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processVideoFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processVideoFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleVideoLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const vid = e.currentTarget;
+    const dur = vid.duration;
+    const width = vid.videoWidth;
+    const height = vid.videoHeight;
+    if (dur && isFinite(dur)) {
+      setVideoDuration(dur);
+      setVideoDimensions({ width, height });
+      if (isCustomUpload) {
+        // Re-analyze metadata with real video length and aspect ratio
+        fetchMetadata(videoTitle, userPrompt, dur, { width, height }, true);
+      }
+    }
   };
 
   const handleSeek = (seconds: number) => {
@@ -287,20 +350,37 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
         <div className="flex-1 w-full space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* Left Column: Video Preview & Sample Selector (5 cols) */}
+            {/* Left Column: Video Preview & Video Source Selector (5 cols) */}
             <div className="lg:col-span-5 space-y-5">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+              <div 
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`bg-slate-900 border rounded-2xl p-4 shadow-xl transition-all ${
+                  isDragging 
+                    ? 'border-purple-500 ring-2 ring-purple-500/40 bg-purple-950/20' 
+                    : 'border-slate-800'
+                }`}
+              >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                    <Film className="w-3.5 h-3.5 text-cyan-400" />
-                    {videoTitle}
-                  </span>
-                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
-                    Preview Player
-                  </span>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Film className={`w-3.5 h-3.5 ${isCustomUpload ? 'text-emerald-400' : 'text-cyan-400'}`} />
+                    <span className="text-xs font-semibold text-slate-300 truncate" title={videoTitle}>
+                      {videoTitle}
+                    </span>
+                  </div>
+                  {isCustomUpload ? (
+                    <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold shrink-0">
+                      {isBn ? 'ইউজার ভিডিও' : 'Uploaded Video'}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded shrink-0">
+                      Sample Video
+                    </span>
+                  )}
                 </div>
 
-                {/* Video Player Box with time tracking */}
+                {/* Video Player Box with time tracking & metadata loader */}
                 <div className="relative rounded-xl overflow-hidden bg-black aspect-video border border-slate-800 group shadow-inner">
                   <video
                     ref={videoRef}
@@ -308,35 +388,62 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
                     controls
                     playsInline
                     onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                    onLoadedMetadata={handleVideoLoadedMetadata}
                     className="w-full h-full object-contain"
                   />
+                  {isDragging && (
+                    <div className="absolute inset-0 bg-purple-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-purple-200 border-2 border-dashed border-purple-400 rounded-xl">
+                      <Upload className="w-8 h-8 animate-bounce mb-1 text-purple-300" />
+                      <p className="text-xs font-bold">{isBn ? 'ভিডিও ফাইল এখানে ড্রপ করুন' : 'Drop video file here to analyze'}</p>
+                    </div>
+                  )}
                 </div>
 
+                {/* Dynamic Video Info Badges */}
+                <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+                  <div className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+                    <p className="text-[10px] text-slate-400">{isBn ? 'আনুমানিক দৈর্ঘ্য' : 'Est. Length'}</p>
+                    <p className="text-xs font-bold text-white font-mono">{metadata?.estimatedLength || '00:15'}</p>
+                  </div>
+                  <div className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+                    <p className="text-[10px] text-slate-400">{isBn ? 'রেজোলিউশন' : 'Resolution'}</p>
+                    <p className="text-xs font-bold text-cyan-400 truncate">{metadata?.resolution ? metadata.resolution.split(' ')[0] : '1080p'}</p>
+                  </div>
+                  <div className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+                    <p className="text-[10px] text-slate-400">{isBn ? 'শনাক্ত অবজেক্ট' : 'Objects'}</p>
+                    <p className="text-xs font-bold text-purple-400">{metadata?.detectedObjects?.length || 5} Items</p>
+                  </div>
+                </div>
 
-            {/* Video Info Badges */}
-            <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-              <div className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
-                <p className="text-[10px] text-slate-400">{isBn ? 'রেজোলিউশন' : 'Resolution'}</p>
-                <p className="text-xs font-bold text-white">1080p Full HD</p>
+                {/* Upload drag-and-drop quick action bar */}
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-3 p-2.5 rounded-xl border border-dashed border-slate-700 hover:border-purple-500 bg-slate-950/50 hover:bg-purple-950/20 text-slate-400 hover:text-purple-300 transition cursor-pointer flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-purple-400" />
+                    <span className="text-[11px] font-medium">
+                      {isCustomUpload && uploadedFileDetails 
+                        ? `${uploadedFileDetails.name} (${uploadedFileDetails.size})`
+                        : (isBn ? 'অন্যান্য ভিডিও ফাইল আপলোড / ড্রপ করুন' : 'Drag & drop or upload custom video')}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                    {isBn ? 'ব্রাউজ' : 'Browse'}
+                  </span>
+                </div>
               </div>
-              <div className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
-                <p className="text-[10px] text-slate-400">{isBn ? 'মডেল' : 'AI Model'}</p>
-                <p className="text-xs font-bold text-cyan-400">Gemini 4 Argon</p>
-              </div>
-              <div className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
-                <p className="text-[10px] text-slate-400">{isBn ? 'প্রসেসিং' : 'Latency'}</p>
-                <p className="text-xs font-bold text-emerald-400">Deep Reasoning</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Sample Videos Selector */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-            <h3 className="text-xs font-bold text-slate-300 mb-3 flex items-center gap-1.5 uppercase tracking-wider">
-              <Eye className="w-3.5 h-3.5 text-indigo-400" />
-              {isBn ? 'টেস্ট করার জন্য স্যাম্পল ভিডিও' : 'Select Sample Video to Test'}
-            </h3>
-            <div className="space-y-2.5">
+              {/* Sample Videos Selector */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                    {isBn ? 'টেস্ট করার জন্য স্যাম্পল ভিডিও' : 'Select Sample Video to Test'}
+                  </h3>
+                  <span className="text-[10px] text-slate-500">Gemini 4 Argon Ready</span>
+                </div>
+                <div className="space-y-2.5">
               {SAMPLE_VIDEOS.map((sample, idx) => {
                 const isSelected = selectedVideoUrl === sample.url;
                 return (
@@ -552,9 +659,11 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
       lang={lang}
       currentTime={currentTime}
       onSeek={handleSeek}
-      onScanWithGeminiArgon={() => fetchMetadata(videoTitle, userPrompt)}
+      onScanWithGeminiArgon={() => fetchMetadata(videoTitle, userPrompt, videoDuration, videoDimensions, isCustomUpload)}
       isOpen={isSidebarOpen}
       onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+      isUploaded={isCustomUpload}
+      fileSize={uploadedFileDetails?.size}
     />
 
   </div>

@@ -762,7 +762,6 @@ export const GenerativeVideoPlayer: React.FC<GenerativeVideoPlayerProps> = ({
                 key={idx}
                 onClick={() => {
                   setCurrentTime(idx * (totalDuration / scenes.length));
-                  setCurrentSceneIndex(idx);
                 }}
                 className="relative bg-slate-900 rounded cursor-pointer overflow-hidden h-full"
                 title={`Scene ${sc.sceneNumber}: ${sc.timestamp}`}
@@ -793,7 +792,6 @@ export const GenerativeVideoPlayer: React.FC<GenerativeVideoPlayerProps> = ({
           <button
             onClick={() => {
               setCurrentTime(0);
-              setCurrentSceneIndex(0);
             }}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
             title="Restart from beginning"
