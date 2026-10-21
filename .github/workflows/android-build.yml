@@ -36,12 +36,10 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK Tools
         uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses
-        run: |
-          yes | sdkmanager --licenses || true
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
       - name: Add Android Platform & Sync
         run: |
