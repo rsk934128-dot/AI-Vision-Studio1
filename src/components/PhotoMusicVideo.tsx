@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { Language, ModelProfile, LocationPreset, MusicGenrePreset, MusicVideoProject, MusicVideoScene } from '../types';
 import { YouTubeUploadModal } from './YouTubeUploadModal';
+import { useToast } from '../context/ToastContext';
 
 interface PhotoMusicVideoProps {
   lang: Language;
@@ -268,6 +269,7 @@ const PRESET_GENRES: MusicGenrePreset[] = [
 
 export const PhotoMusicVideo: React.FC<PhotoMusicVideoProps> = ({ lang }) => {
   const isBn = lang === 'bn';
+  const { notifySuccess, notifyError, notifyRenderSuccess, notifyRenderError } = useToast();
 
   // Model State
   const [modelType, setModelType] = useState<'boy' | 'girl' | 'couple' | 'custom'>('boy');
@@ -450,10 +452,22 @@ export const PhotoMusicVideo: React.FC<PhotoMusicVideoProps> = ({ lang }) => {
         setProject(newProject);
         setIsPlaying(true);
         setCurrentTime(0);
+
+        notifySuccess(
+          'Music Video Synthesized! 🎬',
+          `"${newProject.title}" by ${newProject.artist} is ready with 4 dynamic scenes.`,
+          'মিউজিক ভিডিও সফলভাবে তৈরি হয়েছে! 🎬',
+          `"${newProject.title}" গানটি ৪টি দৃশ্যসহ প্রস্তুত হয়েছে।`
+        );
       }
     } catch (_err) {
       clearInterval(timer);
       setGenerationProgress(100);
+      notifyRenderError(
+        isBn 
+          ? 'মিউজিক ভিডিও তৈরিতে ত্রুটি দেখা দিয়েছে। আবার চেষ্টা করুন।' 
+          : 'Music video generation encountered an error. Please try again.'
+      );
     } finally {
       setIsGenerating(false);
     }

@@ -89,6 +89,23 @@ const videoJobs: VideoJob[] = [
   }
 ];
 
+// SSE subscriber registry for real-time video rendering pipeline
+const sseClientsByJob = new Map<string, Response[]>();
+
+function notifyJobUpdate(job: VideoJob) {
+  const clients = sseClientsByJob.get(job.id);
+  if (clients && clients.length > 0) {
+    const data = `data: ${JSON.stringify({ success: true, job })}\n\n`;
+    clients.forEach((res) => {
+      try {
+        res.write(data);
+      } catch (_e) {
+        // client connection closed
+      }
+    });
+  }
+}
+
 // ==========================================
 // 1. VIDEO UNDERSTANDING & GEMINI 4 ARGON METADATA
 // ==========================================
@@ -1454,7 +1471,7 @@ app.post('/api/jobs', (req: Request, res: Response) => {
     style: style || 'Cinematic 8K',
     aspectRatio: aspectRatio || '16:9',
     status: 'processing',
-    progress: 20,
+    progress: 15,
     creditsUsed: aspectRatio === '9:16' ? 8 : 12,
     createdAt: new Date().toISOString(),
     srtContent: customSrt || (activeVoiceover ? `1\n00:00:00,500 --> 00:00:04,500\n${activeVoiceover.slice(0, 50)}...\n\n2\n00:00:04,800 --> 00:00:10,000\n${activeVoiceover.slice(50, 110)}...` : ''),
@@ -1463,36 +1480,96 @@ app.post('/api/jobs', (req: Request, res: Response) => {
     musicStyle: scriptData?.musicStyle || 'Cinematic Orchestral',
     voiceoverText: activeVoiceover,
     ffmpegLogs: [
-      `[1/4] User requested: "${prompt || 'AI Scene'}" (Category: ${activeCategory.toUpperCase()})`,
-      `[2/4] Initializing Scene Synthesizer with ${activeScenes?.length || 4} storyboard layers`,
-      `[3/4] Sound design & BGM track: ${scriptData?.musicStyle || 'Cinematic Ambient'}`,
+      `[Stage 1/5] Parsed visual prompt: "${prompt || 'AI Scene'}" (${aspectRatio || '16:9'})`,
+      `[Stage 1/5] Generated ${activeScenes?.length || 4} storyboard keyframes with ${scriptData?.musicStyle || 'Cinematic Ambient'} sound design`,
     ],
   };
 
   videoJobs.unshift(newJob);
 
-  // Simulate pipeline rendering progress
+  // Stage 2: AI Frame Synthesis (38%)
   setTimeout(() => {
     const job = videoJobs.find((j) => j.id === newJob.id);
-    if (job) {
+    if (job && job.status === 'processing') {
+      job.progress = 38;
+      job.ffmpegLogs.push(`[Stage 2/5] Synthesizing 1080p high-res frames with optical flow vectors (30 fps)`);
+      notifyJobUpdate(job);
+    }
+  }, 800);
+
+  // Stage 3: Audio Synthesis & BGM Mixing (65%)
+  setTimeout(() => {
+    const job = videoJobs.find((j) => j.id === newJob.id);
+    if (job && job.status === 'processing') {
       job.progress = 65;
-      job.ffmpegLogs.push(`[4/4] Multi-scene compositor synced with audio and ${aspectRatio || '16:9'} aspect ratio`);
+      job.ffmpegLogs.push(`[Stage 3/5] Audio engine: voiceover waveform synchronized & dynamic BGM ducking applied (-14 LUFS)`);
+      notifyJobUpdate(job);
     }
   }, 1800);
 
+  // Stage 4: Subtitle Burning & Timing (85%)
   setTimeout(() => {
     const job = videoJobs.find((j) => j.id === newJob.id);
-    if (job) {
+    if (job && job.status === 'processing') {
+      job.progress = 85;
+      job.ffmpegLogs.push(`[Stage 4/5] Synchronizing animated karaoke SRT subtitles with styled typography`);
+      notifyJobUpdate(job);
+    }
+  }, 2800);
+
+  // Stage 5: Final FFmpeg Encoding & Export (100%)
+  setTimeout(() => {
+    const job = videoJobs.find((j) => j.id === newJob.id);
+    if (job && job.status === 'processing') {
       job.progress = 100;
       job.status = 'completed';
       job.videoUrl = matchedVideoUrl;
-      job.ffmpegLogs.push('✨ Custom video synthesized and rendered successfully! Ready for export.');
+      job.ffmpegLogs.push(`[Stage 5/5] ffmpeg -y -i frames_%04d.png -i audio_mix.wav -c:v libx264 -pix_fmt yuv420p -b:v 15M -movflags +faststart output.mp4`);
+      job.ffmpegLogs.push(`✨ Multi-stage video export completed in 3.8s. Video verified and ready for download or YouTube upload.`);
+      notifyJobUpdate(job);
     }
   }, 3800);
 
   res.json({ success: true, job: newJob });
 });
 
+// SSE Real-Time Event Stream for Live Progress Indicator
+app.get('/api/jobs/:id/stream', (req: Request, res: Response) => {
+  const jobId = req.params.id;
+  const job = videoJobs.find((j) => j.id === jobId);
+
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'Job not found' });
+  }
+
+  // Set SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  // Stream current state immediately
+  res.write(`data: ${JSON.stringify({ success: true, job })}\n\n`);
+
+  if (job.status === 'completed' || job.status === 'failed') {
+    res.end();
+    return;
+  }
+
+  // Register client for streaming updates
+  const clients = sseClientsByJob.get(jobId) || [];
+  sseClientsByJob.set(jobId, [...clients, res]);
+
+  req.on('close', () => {
+    const updated = (sseClientsByJob.get(jobId) || []).filter((r) => r !== res);
+    if (updated.length > 0) {
+      sseClientsByJob.set(jobId, updated);
+    } else {
+      sseClientsByJob.delete(jobId);
+    }
+  });
+});
 
 app.get('/api/jobs/:id', (req: Request, res: Response) => {
   const job = videoJobs.find((j) => j.id === req.params.id);

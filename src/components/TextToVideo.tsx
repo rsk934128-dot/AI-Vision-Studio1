@@ -22,6 +22,8 @@ import {
 import { Language, VideoScript, VideoJob, StudioTab } from '../types';
 import { GenerativeVideoPlayer } from './GenerativeVideoPlayer';
 import { YouTubeUploadModal } from './YouTubeUploadModal';
+import { VideoRenderProgressIndicator } from './VideoRenderProgressIndicator';
+import { useToast } from '../context/ToastContext';
 
 interface TextToVideoProps {
   lang: Language;
@@ -42,6 +44,7 @@ const STYLE_PRESETS = [
 
 export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, presetSrt, onNavigateTab }) => {
   const isBn = lang === 'bn';
+  const { notifySuccess, notifyError, notifyRenderError, notifyInfo } = useToast();
 
   const [prompt, setPrompt] = useState<string>(
     'একটি মহাকাশচারী মঙ্গল গ্রহের লাল বালুকাময় প্রান্তরে হাঁটছে, চারপাশে নিয়ন বায়োলুমিনেসেন্ট আলো আর উড়ন্ত ড্রোন।'
@@ -81,14 +84,24 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
       const data = await res.json();
       if (data.script) {
         setGeneratedScript(data.script);
+        notifySuccess(
+          'AI Script Generated ✨',
+          `Generated "${data.script.title}" with ${data.script.scenes.length} storyboard scenes.`,
+          'এআই চিত্রনাট্য প্রস্তুত ✨',
+          `"${data.script.title}" - ${data.script.scenes.length}টি সিনেমাটিক সিন প্রস্তুত হয়েছে।`
+        );
         if (data.apiKeyNotice) {
           setApiKeyNotice(data.apiKeyNotice);
         }
       } else if (!res.ok || !data.success) {
-        setErrorMsg(data.error || 'Failed to generate script');
+        const err = data.error || 'Failed to generate script';
+        setErrorMsg(err);
+        notifyError('Script Generation Error', err, 'স্ক্রিপ্ট তৈরিতে ত্রুটি', err);
       }
     } catch (_err: any) {
-      setErrorMsg('Script generation failed. Please try again.');
+      const msg = 'Script generation failed. Please try again.';
+      setErrorMsg(msg);
+      notifyError('Script Generation Error', msg, 'স্ক্রিপ্ট তৈরিতে ত্রুটি', 'স্ক্রিপ্ট তৈরিতে ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
     } finally {
       setIsGeneratingScript(false);
     }
@@ -148,6 +161,13 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
       setActiveJob(data.job);
       if (onJobCreated) onJobCreated(data.job);
 
+      notifyInfo(
+        'Video Rendering Started 🚀',
+        `Synthesizing ${aspectRatio} scenes. Real-time progress is active.`,
+        'ভিডিও রেন্ডারিং শুরু হয়েছে 🚀',
+        `${aspectRatio} অ্যাসপেক্ট রেশিওতে সিন্থেসিস ও অডিও সিঙ্ক শুরু হয়েছে।`
+      );
+
       // Poll job status until complete
       const pollInterval = setInterval(async () => {
         try {
@@ -166,8 +186,10 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
         }
       }, 1500);
 
-    } catch (_err: any) {
-      setErrorMsg('Failed to initiate video rendering. Please try again.');
+    } catch (err: any) {
+      const errorText = err?.message || 'Failed to initiate video rendering. Please try again.';
+      setErrorMsg(errorText);
+      notifyRenderError(errorText);
       setIsRendering(false);
     }
   };
@@ -466,12 +488,31 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
         {/* Right Column: Live Video Canvas & Render Logs (6 cols) */}
         <div className="lg:col-span-6 space-y-5">
           
+          {/* Real-time Video Render Progress Indicator Component */}
+          {activeJob && (
+            <VideoRenderProgressIndicator
+              job={activeJob}
+              lang={lang}
+              onComplete={(completedJob) => {
+                setActiveJob(completedJob);
+                setIsRendering(false);
+              }}
+              onCancel={() => {
+                setIsRendering(false);
+              }}
+              onPublishToYouTube={() => setShowYouTubeModal(true)}
+              allowFloatingMinimize={true}
+              showLogsToggle={true}
+            />
+          )}
+
+          {/* Video Preview Canvas Card */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
               <div className="flex items-center gap-2">
                 <Film className="w-4 h-4 text-cyan-400" />
                 <h3 className="text-sm font-bold text-white">
-                  {isBn ? 'ভিডিও প্রিভিউ ও রেন্ডার স্টুডিও' : 'Video Canvas & Production Preview'}
+                  {isBn ? 'ভিডিও প্রিভিউ ও সিন্থেসিস ক্যানভাস' : 'Video Canvas & Preview'}
                 </h3>
               </div>
 
@@ -488,7 +529,14 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
 
             {/* Canvas Video Viewport & Generative Player */}
             <div className="w-full">
-              {isRendering ? (
+              {activeJob?.status === 'completed' || (!isRendering && generatedScript) ? (
+                <GenerativeVideoPlayer
+                  job={activeJob}
+                  script={generatedScript}
+                  aspectRatio={aspectRatio}
+                  lang={lang}
+                />
+              ) : isRendering ? (
                 <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center space-y-3 transition-all duration-300 ${
                   aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
                 }`}>
@@ -496,26 +544,14 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
                     <Loader2 className="w-6 h-6" />
                   </div>
                   <p className="text-xs font-bold text-white">
-                    {isBn ? 'প্রম্পট অনুযায়ী দৃশ্য ও অডিও সিন্থেসিস হচ্ছে...' : 'Synthesizing Custom Scene Frames & Subtitles...'}
+                    {isBn ? 'মাল্টি-স্টেজ ভিডিও রেন্ডারিং ও সিন্থেসিস চলছে...' : 'Active Multi-Stage Pipeline Synthesis...'}
                   </p>
-                  {/* Progress Bar */}
-                  <div className="w-48 bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-cyan-400 to-indigo-500 h-full transition-all duration-500"
-                      style={{ width: `${activeJob?.progress || 40}%` }} 
-                    />
-                  </div>
-                  <span className="text-[10px] text-cyan-400 font-mono">
-                    {activeJob?.progress || 40}% Processed
-                  </span>
+                  <p className="text-[11px] text-slate-400 max-w-xs">
+                    {isBn 
+                      ? 'উপরের প্রগ্রেস ইন্ডিকেটরে ফ্রেম ও অডিও সিন্থেসিসের রিয়েল-টাইম স্ট্যাটাস এবং FFmpeg লগ পর্যবেক্ষণ করুন।'
+                      : 'Watch the real-time stages and FFmpeg console above as the export renders.'}
+                  </p>
                 </div>
-              ) : (activeJob || generatedScript) ? (
-                <GenerativeVideoPlayer
-                  job={activeJob}
-                  script={generatedScript}
-                  aspectRatio={aspectRatio}
-                  lang={lang}
-                />
               ) : (
                 <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-3 transition-all duration-300 ${
                   aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
@@ -536,7 +572,7 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
                   <button
                     onClick={handleStartRender}
                     disabled={!prompt.trim()}
-                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-md shadow-cyan-600/30 flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-md shadow-cyan-600/30 flex items-center gap-1.5 cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>{isBn ? 'এখনই তৈরি করুন' : 'Generate Now'}</span>
@@ -544,51 +580,6 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
                 </div>
               )}
             </div>
-
-
-            {/* Download / Export Bar when Video is ready */}
-            {activeJob && (
-              <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-slate-400">
-                  {isBn ? 'রেডি ফর পাবলিশিং (1080p MP4)' : 'Ready for YouTube & TikTok Export'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowYouTubeModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-md shadow-red-600/20 transition cursor-pointer"
-                  >
-                    <Youtube className="w-3.5 h-3.5" />
-                    <span>{isBn ? 'ইউটিউবে আপলোড' : 'Publish to YouTube'}</span>
-                  </button>
-                  {activeJob.videoUrl && (
-                    <a
-                      href={activeJob.videoUrl}
-                      download="ai_studio_render.mp4"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/20 transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>{isBn ? 'ডাউনলোড' : 'Download'}</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Real-time FFmpeg logs box */}
-            {activeJob && (
-              <div className="mt-4 p-3 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1">
-                <p className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider">
-                  Terminal FFmpeg Pipeline Logs:
-                </p>
-                <div className="font-mono text-[10px] text-slate-400 space-y-0.5">
-                  {activeJob.ffmpegLogs.map((log, i) => (
-                    <div key={i} className="truncate">{log}</div>
-                  ))}
-                </div>
-              </div>
-            )}
 
           </div>
 

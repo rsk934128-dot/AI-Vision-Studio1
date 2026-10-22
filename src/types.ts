@@ -242,4 +242,26 @@ export interface YouTubeUploadedVideo {
   videoUrl?: string;
 }
 
+export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'render';
+
+export interface ToastAction {
+  label: string;
+  labelBn?: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary' | 'danger';
+}
+
+export interface ToastNotification {
+  id: string;
+  type: ToastType;
+  title: string;
+  titleBn?: string;
+  message: string;
+  messageBn?: string;
+  duration?: number; // ms, default 5000, 0 = persistent
+  videoJob?: VideoJob;
+  actions?: ToastAction[];
+  timestamp: number;
+}
+
 

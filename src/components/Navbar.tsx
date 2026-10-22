@@ -16,10 +16,14 @@ import {
   LogOut,
   CheckCircle2,
   ChevronDown,
-  Smartphone
+  Smartphone,
+  Volume2,
+  VolumeX,
+  Bell
 } from 'lucide-react';
 import { StudioTab, Language } from '../types';
 import { useYouTubeAuth } from '../context/YouTubeAuthContext';
+import { useToast } from '../context/ToastContext';
 
 interface NavbarProps {
   activeTab: StudioTab;
@@ -38,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const isBn = lang === 'bn';
   const { user, channel, isAuthenticated, isConnecting, signIn, signOut } = useYouTubeAuth();
+  const { soundEnabled, setSoundEnabled } = useToast();
   const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
 
   const tabs: { id: StudioTab; labelBn: string; labelEn: string; icon: React.ReactNode; badge?: string; badgeColor?: string }[] = [
@@ -271,6 +276,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-slate-400">{isBn ? 'ক্রেডিট:' : 'Credits:'}</span>
               <span className="font-bold text-cyan-400">{credits}</span>
             </div>
+
+            {/* Render Sound Notification Alert Toggle */}
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition border cursor-pointer ${
+                soundEnabled 
+                  ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border-slate-700' 
+                  : 'bg-slate-800/60 hover:bg-slate-700 text-slate-500 border-slate-800'
+              }`}
+              title={soundEnabled ? (isBn ? 'রেন্ডার নোটিফিকেশন সাউন্ড সক্রিয় (ক্লিক করে মিউট করুন)' : 'Render Alert Chime ON (Click to mute)') : (isBn ? 'নোটিফিকেশন সাউন্ড বন্ধ (ক্লিক করে চালু করুন)' : 'Render Alert Chime OFF (Click to unmute)')}
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+              )}
+              <span className="hidden lg:inline text-[10px] font-mono">
+                {soundEnabled ? 'ALERT' : 'MUTE'}
+              </span>
+            </button>
 
             {/* Language Switcher */}
             <button
