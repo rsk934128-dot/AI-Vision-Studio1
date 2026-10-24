@@ -19,7 +19,8 @@ import {
   Smartphone,
   Volume2,
   VolumeX,
-  Bell
+  Bell,
+  History
 } from 'lucide-react';
 import { StudioTab, Language } from '../types';
 import { useYouTubeAuth } from '../context/YouTubeAuthContext';
@@ -66,6 +67,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: <Youtube className="w-4 h-4 text-red-500" />,
       badge: isAuthenticated ? 'Connected' : 'Watch & Hub',
       badgeColor: isAuthenticated ? 'bg-red-950 text-red-400 border-red-800' : 'bg-red-950/40 text-red-400 border-red-800/60'
+    },
+    {
+      id: 'project-history',
+      labelBn: 'প্রজেক্ট হিস্ট্রি',
+      labelEn: 'Project History',
+      icon: <History className="w-4 h-4 text-indigo-400" />,
+      badge: 'Firestore',
+      badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-800'
     },
     {
       id: 'video-understanding',

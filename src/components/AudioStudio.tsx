@@ -17,6 +17,7 @@ import {
   Radio
 } from 'lucide-react';
 import { Language } from '../types';
+import { safeParseResponse } from '../utils/apiClient';
 
 interface AudioStudioProps {
   lang: Language;
@@ -161,12 +162,13 @@ export const AudioStudio: React.FC<AudioStudioProps> = ({ lang, onSendToSubtitle
           }),
         });
 
-        const data = await res.json();
+        const parsed = await safeParseResponse<any>(res);
+        const data = parsed.data || {};
         if (data.transcript) {
           setTranscript(data.transcript);
           setSrtSubtitles(data.srt || '');
-        } else if (!res.ok || !data.success) {
-          setErrorMsg(data.error || 'Failed to transcribe with Gemini 3.5 Transcribe');
+        } else {
+          setErrorMsg(data.error || parsed.error || 'Failed to transcribe with Gemini 3.5 Transcribe');
         }
       };
     } catch (_err: any) {
@@ -192,11 +194,12 @@ export const AudioStudio: React.FC<AudioStudioProps> = ({ lang, onSendToSubtitle
         }),
       });
 
-      const data = await res.json();
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
       if (data.audioUrl) {
         setTtsAudioUrl(data.audioUrl);
-      } else if (!res.ok || !data.success) {
-        setErrorMsg(data.error || 'Failed to generate speech with Gemini TTS');
+      } else {
+        setErrorMsg(data.error || parsed.error || 'Failed to generate speech with Gemini TTS');
       }
     } catch (_err: any) {
       setErrorMsg('Error generating TTS voiceover. Please try again.');

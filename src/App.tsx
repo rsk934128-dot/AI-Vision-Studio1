@@ -16,9 +16,11 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { ShurjoPayHub } from './components/ShurjoPayHub';
 import { YouTubeStudio } from './components/YouTubeStudio';
 import { AndroidGitHubBuilder } from './components/AndroidGitHubBuilder';
+import { ProjectHistory } from './components/ProjectHistory';
+import { saveJobToFirestore } from './services/firebase';
 import { YouTubeAuthProvider } from './context/YouTubeAuthContext';
 import { ToastProvider } from './context/ToastContext';
-import { Sparkles, Video, Search, Mic, Layers, Subtitles, ShieldCheck, Youtube } from 'lucide-react';
+import { Sparkles, Video, Search, Mic, Layers, Subtitles, ShieldCheck, Youtube, History } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<StudioTab>('photo-music-video');
@@ -35,6 +37,7 @@ export default function App() {
 
   const handleJobCreated = (job: VideoJob) => {
     setCredits((prev) => Math.max(0, prev - (job.creditsUsed || 10)));
+    saveJobToFirestore(job);
   };
 
   return (
@@ -71,6 +74,14 @@ export default function App() {
             <YouTubeStudio
               lang={lang}
               onNavigateTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'project-history' && (
+            <ProjectHistory
+              lang={lang}
+              onNavigateTab={setActiveTab}
+              onSendToSubtitles={handleSendToSubtitles}
             />
           )}
 

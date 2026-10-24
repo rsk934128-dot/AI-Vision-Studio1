@@ -43,6 +43,7 @@ export const YouTubeUploadModal: React.FC<YouTubeUploadModalProps> = ({
     isConnecting,
     isUploading,
     signIn,
+    connectDemoChannel,
     uploadVideo,
     error,
     clearError
@@ -120,14 +121,23 @@ export const YouTubeUploadModal: React.FC<YouTubeUploadModalProps> = ({
         {/* Form Body */}
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-950/80 border border-red-800 rounded-xl text-red-200 text-xs flex items-center justify-between">
+            <div className="mb-4 p-3 bg-red-950/80 border border-red-800 rounded-xl text-red-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <span>{error}</span>
+                <span className="leading-snug">{error}</span>
               </div>
-              <button onClick={clearError} className="underline text-red-400">
-                {isBn ? 'বাদ দিন' : 'Dismiss'}
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={connectDemoChannel}
+                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-lg font-bold text-[11px] transition"
+                >
+                  {isBn ? 'ডেমো চ্যানেল ব্যবহার করুন' : 'Use Demo Channel'}
+                </button>
+                <button type="button" onClick={clearError} className="underline text-red-400 hover:text-white text-xs">
+                  {isBn ? 'বাদ দিন' : 'Dismiss'}
+                </button>
+              </div>
             </div>
           )}
 

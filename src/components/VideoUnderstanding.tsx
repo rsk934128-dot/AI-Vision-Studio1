@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Language, VideoUnderstandingMetadata } from '../types';
 import { VideoMetadataSidebar } from './VideoMetadataSidebar';
+import { safeParseResponse } from '../utils/apiClient';
 
 interface VideoUnderstandingProps {
   lang: Language;
@@ -118,8 +119,9 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
           isUploaded: isUploaded !== undefined ? isUploaded : isCustomUpload
         }),
       });
-      const data = await res.json();
-      if (data.success && data.metadata) {
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
+      if (parsed.success && data.metadata) {
         setMetadata(data.metadata);
       }
     } catch (_err) {
@@ -254,7 +256,8 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
         }),
       });
 
-      const data = await res.json();
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
       if (data.analysis) {
         setAnalysisResult(data.analysis);
         if (data.modelUsed) {
@@ -263,8 +266,8 @@ export const VideoUnderstanding: React.FC<VideoUnderstandingProps> = ({ lang }) 
         if (data.metadata) {
           setMetadata(data.metadata);
         }
-      } else if (!res.ok || !data.success) {
-        setErrorMsg(data.error || 'Failed to analyze video');
+      } else {
+        setErrorMsg(data.error || parsed.error || 'Failed to analyze video');
       }
     } catch (_err: any) {
       setErrorMsg('Could not complete video analysis. Please check network connection.');

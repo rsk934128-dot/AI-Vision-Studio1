@@ -34,6 +34,8 @@ import {
 import { Language, ModelProfile, LocationPreset, MusicGenrePreset, MusicVideoProject, MusicVideoScene } from '../types';
 import { YouTubeUploadModal } from './YouTubeUploadModal';
 import { useToast } from '../context/ToastContext';
+import { safeParseResponse } from '../utils/apiClient';
+import { saveJobToFirestore } from '../services/firebase';
 
 interface PhotoMusicVideoProps {
   lang: Language;
@@ -407,12 +409,13 @@ export const PhotoMusicVideo: React.FC<PhotoMusicVideoProps> = ({ lang }) => {
         })
       });
 
-      const data = await res.json();
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
       clearInterval(timer);
       setGenerationProgress(100);
       setGenerationStep(isBn ? 'মিউজিক ভিডিও তৈরি সম্পন্ন!' : 'Music Video Production Complete!');
 
-      if (data.success && data.project) {
+      if (parsed.success && data.project) {
         const raw = data.project;
         const newProject: MusicVideoProject = {
           id: `mv_${Date.now()}`,
@@ -452,6 +455,23 @@ export const PhotoMusicVideo: React.FC<PhotoMusicVideoProps> = ({ lang }) => {
         setProject(newProject);
         setIsPlaying(true);
         setCurrentTime(0);
+
+        // Save persistent record to Firestore & local cache
+        saveJobToFirestore({
+          id: newProject.id,
+          userId: 'user_music_creator',
+          prompt: `${newProject.title} - ${newProject.artist} (${activeLocationName})`,
+          style: `${selectedGenre.name} - ${activeModelName}`,
+          aspectRatio: newProject.aspectRatio,
+          status: 'completed',
+          progress: 100,
+          videoUrl: newProject.videoUrl,
+          voiceoverText: newProject.music.lyricsBn,
+          srtContent: `1\n00:00:01,000 --> 00:00:07,000\n${newProject.music.lyricsBn}\n\n2\n00:00:07,500 --> 00:00:15,000\n${newProject.music.lyricsEn}`,
+          creditsUsed: 15,
+          createdAt: new Date().toISOString(),
+          ffmpegLogs: ['FFmpeg music video render completed successfully']
+        });
 
         notifySuccess(
           'Music Video Synthesized! 🎬',

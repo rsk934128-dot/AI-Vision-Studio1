@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with credits, preferences, and YouTube connection metadata",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "photoURL": { "type": "string", "description": "Avatar image URL" },
+        "credits": { "type": "number", "description": "Remaining video generation credits" },
+        "preferredLanguage": { "type": "string", "enum": ["bn", "en"], "description": "Preferred UI language" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["uid", "credits"]
+    },
+    "VideoJob": {
+      "title": "VideoJob",
+      "description": "Video generation pipeline rendering job",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique job identifier" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "prompt": { "type": "string", "description": "Text or song prompt" },
+        "style": { "type": "string", "description": "Visual or musical style" },
+        "aspectRatio": { "type": "string", "enum": ["16:9", "9:16", "1:1"], "description": "Video aspect ratio" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"], "description": "Pipeline execution status" },
+        "progress": { "type": "number", "description": "Percentage progress 0-100" },
+        "videoUrl": { "type": "string", "description": "Generated MP4 video URL" },
+        "voiceoverText": { "type": "string", "description": "Synthesized voiceover script" },
+        "srtContent": { "type": "string", "description": "SRT subtitle stream" },
+        "creditsUsed": { "type": "number", "description": "Credits consumed" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Status update timestamp" }
+      },
+      "required": ["id", "userId", "prompt", "status", "progress"]
+    },
+    "PaymentTransaction": {
+      "title": "PaymentTransaction",
+      "description": "shurjoPay or in-app payment transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Transaction identifier" },
+        "userId": { "type": "string", "description": "User UID who made payment" },
+        "orderId": { "type": "string", "description": "Merchant order number" },
+        "amount": { "type": "number", "description": "Amount paid in BDT" },
+        "currency": { "type": "string", "description": "Currency code" },
+        "method": { "type": "string", "description": "Payment gateway (bKash/Nagad/Rocket)" },
+        "status": { "type": "string", "description": "Transaction status" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Timestamp of payment" }
+      },
+      "required": ["id", "userId", "orderId", "amount", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User private profile and credit balance"
+    },
+    "/users/{userId}/jobs/{jobId}": {
+      "schema": "VideoJob",
+      "description": "User specific video rendering jobs"
+    },
+    "/users/{userId}/transactions/{txId}": {
+      "schema": "PaymentTransaction",
+      "description": "User payment records and recharge history"
+    }
+  }
+}

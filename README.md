@@ -27,11 +27,11 @@ An enterprise-grade, full-stack generative AI video production platform built wi
   - [Method 1: Automated CI/CD via GitHub Actions (Recommended)](#method-1-automated-cicd-via-github-actions-recommended)
   - [Method 2: Manual Trigger via GitHub Actions UI](#method-2-manual-trigger-via-github-actions-ui)
   - [Method 3: Local Android Build via Gradle](#method-3-local-android-build-via-gradle)
-- [Where to Find the Generated APK File](#-where-to-find-the-generated-apk-file)
-  - [1. GitHub Releases (Direct .apk Download)](#1-github-releases-direct-apk-download)
-  - [2. GitHub Actions Artifacts](#2-github-actions-artifacts)
-  - [3. Local Build Output Location](#3-local-build-output-location)
-  - [Installing the APK on Android](#installing-the-apk-on-android)
+- [Getting Your APK](#-getting-your-apk)
+  - [Step-by-Step: Downloading from GitHub Actions](#step-by-step-downloading-from-github-actions)
+  - [Alternative: Direct Download via GitHub Releases](#alternative-direct-download-via-github-releases)
+  - [Local Build Output Location](#local-build-output-location)
+  - [Installing the APK on Your Android Device](#installing-the-apk-on-your-android-device)
 - [Project Architecture](#-project-architecture)
 - [License & Security](#-license--security)
 
@@ -226,43 +226,74 @@ chmod +x gradlew
 
 ---
 
-## 📦 Where to Find the Generated APK File
+## 📦 Getting Your APK
 
-After the GitHub Actions workflow finishes successfully (marked with a green checkmark `✔`), there are two ways to retrieve your APK:
+Follow these simple steps to retrieve the generated `.apk` installer after any commit or build:
 
-### 1. GitHub Releases (Direct .apk Download)
-*The fastest method on both PC and mobile phones (no extraction needed).*
+### Step-by-Step: Downloading from GitHub Actions
 
-1. Navigate to the homepage of your GitHub repository.
-2. On the right sidebar, locate the **Releases** section.
-3. Click on the **Latest** release (titled `📱 AI Video Studio Android APK (Latest Build)`).
-4. Under **Assets**, click directly on **`app-debug.apk`** to download it straight to your device.
+1. **Navigate to the 'Actions' tab:**
+   - Open your project repository on GitHub (`https://github.com/<YOUR_USER>/<YOUR_REPO>`).
+   - In the top navigation bar (under the repository name), click on the **Actions** tab.
+
+2. **Select the latest run:**
+   - In the left sidebar or the main workflow list, look for the most recent workflow execution (e.g., **`Android CI`** or **`Build Android APK & AAB`**).
+   - Ensure the workflow has finished with a green checkmark (**`✔`**). Click on the title of the latest run to open its summary details.
+
+3. **Locate the Artifacts section:**
+   - On the workflow run summary page, scroll down to the bottom where the **Artifacts** table is displayed.
+
+4. **Download the 'app-debug' artifact:**
+   - Click directly on the **`app-debug`** row (or click the download icon next to it).
+   - GitHub will download a ZIP file named **`app-debug.zip`**.
+
+5. **Extract the APK:**
+   - Unzip or extract the downloaded `app-debug.zip` archive on your computer or mobile phone.
+   - Inside you will find the ready-to-install **`app-debug.apk`** file.
+
+```
+┌────────────────────────────────────────────────────────┐
+│ GitHub Repository Header                                │
+│ [Code]   [Issues]   [Pull requests]   👉 [Actions] 👈  │
+└────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ Workflow Runs                                          │
+│  ✔ Android CI - commit "feat: update..." (Latest Run)  │ ◄── Click this
+└────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ Workflow Summary (Scroll to bottom)                    │
+│ ┌───────────────────────┬──────────────┬─────────────┐ │
+│ │ Artifact Name         │ Size         │ Download    │ │
+│ ├───────────────────────┼──────────────┼─────────────┤ │
+│ │ 📦 app-debug          │ ~35 MB       │ 📥 [Click]  │ │ ◄── Download
+│ └───────────────────────┴──────────────┴─────────────┘ │
+└────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+                  Extract `app-debug.zip`
+                           │
+                           ▼
+                  📱 `app-debug.apk`
+```
 
 ---
 
-### 2. GitHub Actions Artifacts
-*Available directly within the workflow run details.*
+### Alternative: Direct Download via GitHub Releases
+*If you prefer not to unzip artifacts, our CI/CD also automatically publishes the raw `.apk` directly to GitHub Releases:*
 
-1. Go to the **Actions** tab in your repository.
-2. Click on the latest workflow run: **`Build Android APK & AAB`**.
-3. Scroll down to the bottom of the **Summary** page to the **Artifacts** table.
-4. Click on **`ai-video-studio-debug-apk`**.
-5. This downloads a `.zip` archive containing the `app-debug.apk` file. Extract the ZIP file to access the APK.
-
-```
-GitHub Repository
-└── Actions Tab
-    └── Latest Successful Workflow Run
-        └── Summary Page (Scroll down)
-            └── 📦 Artifacts: ai-video-studio-debug-apk.zip
-                └── 📄 app-debug.apk
-```
+1. On the main page of your repository, check the right sidebar for **Releases**.
+2. Click on the latest release tag (**`latest-apk`**).
+3. Under **Assets**, click directly on **`app-debug.apk`** to download it without needing any zip extraction.
 
 ---
 
-### 3. Local Build Output Location
+### Local Build Output Location
 
-When building locally via command line or Android Studio, the compiled APK is located at:
+If you compiled the Android APK locally using `./gradlew assembleDebug`, the generated APK is stored at:
 
 ```
 android/app/build/outputs/apk/debug/app-debug.apk
@@ -270,12 +301,14 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-### 📲 Installing the APK on Android
+### 📲 Installing the APK on Your Android Device
 
-1. Transfer or download `app-debug.apk` to your Android device (running Android 7.0 Nougat / API 24 or newer).
-2. Tap on the APK file to open it.
-3. If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and toggle **Allow from this source**.
-4. Tap **Install** and launch **AI Video Studio**!
+1. Transfer or download **`app-debug.apk`** to your Android phone or tablet (supports Android 7.0 / API 24 through Android 15+ / API 36).
+2. Tap on the APK file in your phone's file manager or browser downloads.
+3. If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*:
+   - Tap **Settings**.
+   - Toggle on **Allow from this source**.
+4. Tap **Install** and open **AI Video Studio**!
 
 ---
 

@@ -7,6 +7,7 @@ export type StudioTab =
   | 'audio-transcribe'
   | 'video-to-video'
   | 'subtitles'
+  | 'project-history'
   | 'shurjopay-gmail'
   | 'youtube-studio'
   | 'android-builder'

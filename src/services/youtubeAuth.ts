@@ -1,18 +1,13 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getAuth, 
   signInWithPopup, 
   signOut as firebaseSignOut, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   User 
 } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { app, auth } from './firebase';
+export { app, auth };
 import { YouTubeChannelProfile, YouTubeUploadedVideo } from '../types';
-
-// Initialize Firebase App
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
 
 // Desired YouTube OAuth Scopes configured for this applet
 export const YOUTUBE_SCOPES = [
@@ -147,7 +142,7 @@ export const fetchYouTubeChannel = async (
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ items: [] }));
     if (!data.items || data.items.length === 0) {
       // User is logged in but might not have an active public YouTube channel yet
       if (user) {
@@ -230,7 +225,7 @@ export const fetchRecentYouTubeVideos = async (
         }
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ items: [] }));
         return (data.items || []).map((item: any) => ({
           id: item.snippet?.resourceId?.videoId || item.id,
           title: item.snippet?.title || 'Untitled Video',
@@ -253,7 +248,7 @@ export const fetchRecentYouTubeVideos = async (
     });
 
     if (sRes.ok) {
-      const sData = await sRes.json();
+      const sData = await sRes.json().catch(() => ({ items: [] }));
       return (sData.items || []).map((item: any) => ({
         id: item.id?.videoId || item.id,
         title: item.snippet?.title || 'Untitled Video',
@@ -367,7 +362,7 @@ export const uploadVideoToYouTube = async (
     if (onProgress) onProgress(90);
 
     if (uploadRes.ok) {
-      const resData = await uploadRes.json();
+      const resData = await uploadRes.json().catch(() => ({}));
       const videoId = resData.id || ('yt_' + Math.random().toString(36).substring(2, 10));
       if (onProgress) onProgress(100);
       return {

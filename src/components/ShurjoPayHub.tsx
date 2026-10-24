@@ -22,6 +22,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Language, ShurjoPayTransaction } from '../types';
+import { safeParseResponse } from '../utils/apiClient';
 
 interface ShurjoPayHubProps {
   lang: Language;
@@ -54,8 +55,9 @@ export const ShurjoPayHub: React.FC<ShurjoPayHubProps> = ({ lang }) => {
   const fetchTransactions = async () => {
     try {
       const res = await fetch('/api/shurjopay/transactions');
-      const data = await res.json();
-      if (data.success) {
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
+      if (parsed.success && data.transactions) {
         setTransactions(data.transactions);
         if (data.metrics) setMetrics(data.metrics);
       }
@@ -86,8 +88,9 @@ export const ShurjoPayHub: React.FC<ShurjoPayHubProps> = ({ lang }) => {
         }),
       });
 
-      const data = await res.json();
-      if (data.success) {
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
+      if (parsed.success && data.emailLog) {
         setLastEmailLog(data.emailLog);
         fetchTransactions();
       }

@@ -1719,6 +1719,26 @@ app.post('/api/shurjopay/resend-email', (req: Request, res: Response) => {
 });
 
 // ==========================================
+// API 404 GUARD & GLOBAL ERROR HANDLER
+// ==========================================
+// Strictly catch all unmatched /api/* requests so Vite SPA never returns <!doctype html> for APIs
+app.all('/api/*', (req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    error: `API route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Global Express error handler ensuring JSON responses
+app.use((err: any, _req: Request, res: Response, _next: any) => {
+  console.error('Unhandled server error:', err);
+  res.status(500).json({
+    success: false,
+    error: err?.message || 'Internal server error occurred',
+  });
+});
+
+// ==========================================
 // VITE DEV MIDDLEWARE / STATIC SERVING
 // ==========================================
 async function startServer() {

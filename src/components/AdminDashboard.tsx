@@ -15,6 +15,7 @@ import {
   GitBranch
 } from 'lucide-react';
 import { Language, VideoJob } from '../types';
+import { safeParseResponse } from '../utils/apiClient';
 
 interface AdminDashboardProps {
   lang: Language;
@@ -31,8 +32,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
     try {
       setLoading(true);
       const res = await fetch('/api/jobs');
-      const data = await res.json();
-      if (data.success) {
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
+      if (parsed.success && data.jobs) {
         setJobs(data.jobs);
       }
     } catch (_e) {

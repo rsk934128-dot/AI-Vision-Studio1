@@ -155,6 +155,9 @@ export const VideoRenderProgressIndicator: React.FC<VideoRenderProgressIndicator
     const fetchLatestJobState = async () => {
       try {
         const res = await fetch(`/api/jobs/${currentJob.id}`);
+        if (!res.ok) return;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) return;
         const data = await res.json();
         if (isSubscribed && data.success && data.job) {
           setCurrentJob(data.job);

@@ -18,11 +18,13 @@ interface YouTubeAuthContextType {
   channel: YouTubeChannelProfile | null;
   recentVideos: YouTubeUploadedVideo[];
   isAuthenticated: boolean;
+  isDemoMode: boolean;
   isLoading: boolean;
   isConnecting: boolean;
   isUploading: boolean;
   error: string | null;
   signIn: () => Promise<void>;
+  connectDemoChannel: () => void;
   signOut: () => Promise<void>;
   refreshChannel: () => Promise<void>;
   fetchVideos: () => Promise<void>;
@@ -35,6 +37,45 @@ interface YouTubeAuthContextType {
 
 const EMPTY_VIDEOS: YouTubeUploadedVideo[] = [];
 
+const DEMO_CHANNEL: YouTubeChannelProfile = {
+  id: 'UC_ai_video_studio_bd_official',
+  title: 'AI Video Studio Bangladesh (Official)',
+  description: 'AI Generated Cinema, 4K Music Videos & YouTube Shorts Studio powered by Google Gemini.',
+  customUrl: '@AIVideoStudioBD',
+  thumbnails: {
+    default: { url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80' },
+    medium: { url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80' },
+    high: { url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80' },
+  },
+  statistics: {
+    viewCount: '184920',
+    subscriberCount: '24500',
+    hiddenSubscriberCount: false,
+    videoCount: '18'
+  }
+};
+
+const INITIAL_DEMO_VIDEOS: YouTubeUploadedVideo[] = [
+  {
+    id: 'aircAruvnKk',
+    title: 'Cox\'s Bazar Sunset - AI Romantic Music Video (Official 4K)',
+    description: 'Generated with AI Video Studio Bangladesh featuring high-definition neural synthesizer and Bengali vocal highlights.',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80',
+    publishedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    privacyStatus: 'public',
+    videoUrl: 'https://www.youtube.com/watch?v=aircAruvnKk'
+  },
+  {
+    id: '7NOSDKb0HlU',
+    title: 'Sundarbans Mystery - Cinematic Drone Travelogue',
+    description: 'Multimodal AI video understanding and dynamic scene cut generation.',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80',
+    publishedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    privacyStatus: 'public',
+    videoUrl: 'https://www.youtube.com/watch?v=7NOSDKb0HlU'
+  }
+];
+
 const YouTubeAuthContext = createContext<YouTubeAuthContextType | undefined>(undefined);
 
 export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -42,6 +83,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [channel, setChannel] = useState<YouTubeChannelProfile | null>(null);
   const [recentVideos, setRecentVideos] = useState<YouTubeUploadedVideo[]>(EMPTY_VIDEOS);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -55,6 +97,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (!isMounted) return;
         setUser(authUser);
         setAccessToken(token);
+        setIsDemoMode(false);
         try {
           const ch = await fetchYouTubeChannel(token, authUser);
           if (isMounted) {
@@ -72,10 +115,12 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       },
       () => {
         if (!isMounted) return;
-        setUser((prev) => (prev !== null ? null : prev));
-        setAccessToken((prev) => (prev !== null ? null : prev));
-        setChannel((prev) => (prev !== null ? null : prev));
-        setRecentVideos((prev) => (prev.length > 0 ? EMPTY_VIDEOS : prev));
+        if (!isDemoMode) {
+          setUser((prev) => (prev !== null ? null : prev));
+          setAccessToken((prev) => (prev !== null ? null : prev));
+          setChannel((prev) => (prev !== null ? null : prev));
+          setRecentVideos((prev) => (prev.length > 0 ? EMPTY_VIDEOS : prev));
+        }
         setIsLoading(false);
       }
     );
@@ -84,6 +129,21 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       isMounted = false;
       unsubscribe();
     };
+  }, [isDemoMode]);
+
+  const connectDemoChannel = useCallback(() => {
+    setError(null);
+    setIsDemoMode(true);
+    setAccessToken('demo_token_creator_verified');
+    setUser({
+      uid: 'demo_creator_bangladesh',
+      displayName: 'Creator (AI Studio BD)',
+      email: 'creator@aivideostudio.com',
+      photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+    } as unknown as User);
+    setChannel(DEMO_CHANNEL);
+    setRecentVideos(INITIAL_DEMO_VIDEOS);
+    setIsLoading(false);
   }, []);
 
   const signIn = useCallback(async () => {
@@ -94,6 +154,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       setUser(res.user);
       setAccessToken(res.accessToken);
       setChannel(res.channel);
+      setIsDemoMode(false);
 
       // Fetch initial videos
       if (res.accessToken && res.channel?.uploadsPlaylistId) {
@@ -102,11 +163,20 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       }
     } catch (err: any) {
       console.error('Failed to sign in to YouTube:', err);
-      let message = 'ইউটিউব লগইন সম্পন্ন করা যায়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।';
+      const rawMsg = err?.message || '';
+      const isInvalidAction = 
+        rawMsg.includes('requested action is invalid') ||
+        err?.code === 'auth/invalid-action-code' ||
+        err?.code === 'auth/unauthorized-domain' ||
+        err?.code === 'auth/operation-not-allowed';
+
+      let message = 'ইউটিউব গুগল অ্যাকাউন্টে লগইন করা যায়নি।';
       if (err?.code === 'auth/popup-closed-by-user') {
         message = 'লগইন উইন্ডোটি বন্ধ করা হয়েছে (Popup closed).';
-      } else if (err?.message) {
-        message = err.message;
+      } else if (isInvalidAction) {
+        message = 'গুগল অথরাইজেশন এরর ("The requested action is invalid"): প্রিভিউ আইফ্রেম ডোমেইন বা থার্ড-পার্টি কুকিজ রেস্ট্রিকশনের কারণে লাইভ পপআপ ব্লক হয়েছে। অনুগ্রহ করে "ডেমো চ্যানেল কানেক্ট করুন" বাটনে ক্লিক করুন।';
+      } else if (rawMsg) {
+        message = rawMsg;
       }
       setError(message);
     } finally {
@@ -121,6 +191,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       setUser(null);
       setAccessToken(null);
       setChannel(null);
+      setIsDemoMode(false);
       setRecentVideos(EMPTY_VIDEOS);
     } catch (err: any) {
       console.error('Sign out error:', err);
@@ -129,6 +200,10 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, []);
 
   const refreshChannel = useCallback(async () => {
+    if (isDemoMode) {
+      setChannel(DEMO_CHANNEL);
+      return;
+    }
     const token = accessToken || getCachedAccessToken();
     if (!token || !user) return;
     try {
@@ -141,9 +216,13 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     } catch (err) {
       console.error('Refresh error:', err);
     }
-  }, [accessToken, user]);
+  }, [accessToken, user, isDemoMode]);
 
   const fetchVideos = useCallback(async () => {
+    if (isDemoMode) {
+      setRecentVideos(INITIAL_DEMO_VIDEOS);
+      return;
+    }
     const token = accessToken || getCachedAccessToken();
     if (!token) return;
     try {
@@ -152,7 +231,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     } catch (err) {
       console.error('Error fetching videos:', err);
     }
-  }, [accessToken, channel]);
+  }, [accessToken, channel, isDemoMode]);
 
   const uploadVideo = useCallback(async (
     payload: YouTubeUploadPayload,
@@ -164,6 +243,34 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
     setIsUploading(true);
     setError(null);
+
+    // If Demo Mode, simulate complete YouTube deployment pipeline
+    if (isDemoMode) {
+      if (onProgress) onProgress(25);
+      await new Promise((r) => setTimeout(r, 600));
+      if (onProgress) onProgress(65);
+      await new Promise((r) => setTimeout(r, 600));
+      if (onProgress) onProgress(100);
+
+      const demoVideoId = 'yt_demo_' + Math.random().toString(36).substring(2, 9);
+      const newVideo: YouTubeUploadedVideo = {
+        id: demoVideoId,
+        title: payload.title,
+        description: payload.description,
+        thumbnailUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
+        publishedAt: new Date().toISOString(),
+        privacyStatus: payload.privacyStatus,
+        videoUrl: `https://www.youtube.com/watch?v=${demoVideoId}`
+      };
+      setRecentVideos((prev) => [newVideo, ...prev]);
+      setIsUploading(false);
+      return {
+        videoId: demoVideoId,
+        watchUrl: `https://www.youtube.com/watch?v=${demoVideoId}`,
+        studioUrl: `https://studio.youtube.com/video/${demoVideoId}/edit`
+      };
+    }
+
     try {
       const result = await uploadVideoToYouTube(token, payload, onProgress);
       // Refresh uploaded list after short delay
@@ -178,7 +285,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     } finally {
       setIsUploading(false);
     }
-  }, [accessToken, fetchVideos]);
+  }, [accessToken, fetchVideos, isDemoMode]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -187,12 +294,14 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     accessToken,
     channel,
     recentVideos,
-    isAuthenticated: !!user && !!accessToken,
+    isAuthenticated: (!!user && !!accessToken) || isDemoMode,
+    isDemoMode,
     isLoading,
     isConnecting,
     isUploading,
     error,
     signIn,
+    connectDemoChannel,
     signOut,
     refreshChannel,
     fetchVideos,
@@ -203,11 +312,13 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     accessToken,
     channel,
     recentVideos,
+    isDemoMode,
     isLoading,
     isConnecting,
     isUploading,
     error,
     signIn,
+    connectDemoChannel,
     signOut,
     refreshChannel,
     fetchVideos,

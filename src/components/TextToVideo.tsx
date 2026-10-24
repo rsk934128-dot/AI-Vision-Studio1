@@ -24,6 +24,7 @@ import { GenerativeVideoPlayer } from './GenerativeVideoPlayer';
 import { YouTubeUploadModal } from './YouTubeUploadModal';
 import { VideoRenderProgressIndicator } from './VideoRenderProgressIndicator';
 import { useToast } from '../context/ToastContext';
+import { safeParseResponse } from '../utils/apiClient';
 
 interface TextToVideoProps {
   lang: Language;
@@ -81,7 +82,8 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
         }),
       });
 
-      const data = await res.json();
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data || {};
       if (data.script) {
         setGeneratedScript(data.script);
         notifySuccess(
@@ -93,8 +95,8 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
         if (data.apiKeyNotice) {
           setApiKeyNotice(data.apiKeyNotice);
         }
-      } else if (!res.ok || !data.success) {
-        const err = data.error || 'Failed to generate script';
+      } else {
+        const err = data.error || parsed.error || 'Failed to generate script';
         setErrorMsg(err);
         notifyError('Script Generation Error', err, 'স্ক্রিপ্ট তৈরিতে ত্রুটি', err);
       }
@@ -128,8 +130,9 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
             style: selectedStyle,
           }),
         });
-        const scriptData = await scriptRes.json();
-        if (scriptData.script) {
+        const parsedScript = await safeParseResponse<any>(scriptRes);
+        const scriptData = parsedScript.data;
+        if (scriptData?.script) {
           setGeneratedScript(scriptData.script);
           currentScenes = scriptData.script.scenes;
           currentVoiceover = scriptData.script.fullVoiceoverText;
@@ -153,9 +156,10 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to submit render job');
+      const parsed = await safeParseResponse<any>(res);
+      const data = parsed.data;
+      if (!parsed.success || !data?.job) {
+        throw new Error(data?.error || parsed.error || 'Failed to submit render job');
       }
 
       setActiveJob(data.job);
@@ -172,8 +176,9 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
       const pollInterval = setInterval(async () => {
         try {
           const pollRes = await fetch(`/api/jobs/${data.job.id}`);
-          const pollData = await pollRes.json();
-          if (pollData.success && pollData.job) {
+          const parsedPoll = await safeParseResponse<any>(pollRes);
+          const pollData = parsedPoll.data;
+          if (pollData?.success && pollData.job) {
             setActiveJob(pollData.job);
             if (pollData.job.status === 'completed' || pollData.job.status === 'failed') {
               clearInterval(pollInterval);
