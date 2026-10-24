@@ -20,6 +20,7 @@ import { ProjectHistory } from './components/ProjectHistory';
 import { saveJobToFirestore } from './services/firebase';
 import { YouTubeAuthProvider } from './context/YouTubeAuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Sparkles, Video, Search, Mic, Layers, Subtitles, ShieldCheck, Youtube, History } from 'lucide-react';
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
   return (
     <YouTubeAuthProvider>
       <ToastProvider lang={lang}>
+        <SpeedInsights />
         <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
         {/* Top Navigation */}
         <Navbar
