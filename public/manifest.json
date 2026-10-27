@@ -3,15 +3,9 @@
   "name": "AI Video Studio - Photo Music Video & YouTube Production",
   "icons": [
     {
-      "src": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=192&auto=format&fit=crop&q=80",
+      "src": "/logo.jpg",
       "type": "image/jpeg",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=512&auto=format&fit=crop&q=80",
-      "type": "image/jpeg",
-      "sizes": "512x512",
+      "sizes": "192x192 512x512",
       "purpose": "any maskable"
     }
   ],

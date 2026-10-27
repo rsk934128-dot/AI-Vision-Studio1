@@ -13,9 +13,11 @@ import {
   Maximize2,
   CheckCircle2,
   Sliders,
-  Eye
+  Eye,
+  Stamp
 } from 'lucide-react';
 import { VideoJob, VideoScript, VideoScriptScene, Language } from '../types';
+import { useWatermark } from '../context/WatermarkContext';
 
 interface GenerativeVideoPlayerProps {
   job: VideoJob | null;
@@ -68,6 +70,7 @@ export const GenerativeVideoPlayer: React.FC<GenerativeVideoPlayerProps> = ({
   const isBn = lang === 'bn';
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { config: watermarkConfig, openModal: openWatermarkModal, drawWatermarkOnCanvas } = useWatermark();
 
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);

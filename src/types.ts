@@ -1,6 +1,7 @@
 export type Language = 'bn' | 'en';
 
 export type StudioTab = 
+  | 'audio-presentation'
   | 'text-to-video'
   | 'photo-music-video'
   | 'video-understanding'
@@ -119,6 +120,8 @@ export interface VideoJob {
   aspectRatio: '16:9' | '9:16' | '1:1';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
+  duration?: number; // duration in seconds
+  resolution?: string; // e.g. '4K (2160p)', '1080p (FHD)', '720p (HD)'
   videoUrl?: string;
   voiceoverUrl?: string;
   voiceoverText?: string;
@@ -243,6 +246,16 @@ export interface YouTubeUploadedVideo {
   videoUrl?: string;
 }
 
+export interface YouTubeTrack {
+  id: string;
+  title: string;
+  channel: string;
+  duration: string;
+  views?: string;
+  thumbnail: string;
+  category?: string;
+}
+
 export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'render';
 
 export interface ToastAction {
@@ -264,5 +277,44 @@ export interface ToastNotification {
   actions?: ToastAction[];
   timestamp: number;
 }
+
+export interface PresentationScene {
+  sceneNumber: number;
+  timeStart: number; // in seconds
+  timeEnd: number; // in seconds
+  timestampLabel: string; // e.g. "00:00 - 00:15"
+  lyricsLine: string; // spoken or sung words
+  emotionalTone: string; // e.g. "গভীর প্রেম ও রোমান্টিক বিষাদ"
+  sceneTitle: string; // e.g. "কুয়াশাচ্ছন্ন রেলস্টেশনের স্মৃতি"
+  visualPrompt: string; // image prompt
+  imageUrl: string; // high res image url
+  cameraMotion: 'ken-burns-in' | 'ken-burns-out' | 'pan-left' | 'pan-right' | 'tilt-up' | 'slow-drift';
+  particleOverlay: 'rain' | 'bokeh' | 'embers' | 'fog' | 'stardust' | 'leaves' | 'none';
+  colorMood: string;
+}
+
+export interface AudioPresentationProject {
+  id: string;
+  userId?: string;
+  title: string;
+  artist: string;
+  audioUrl: string;
+  duration: number;
+  aspectRatio: '16:9' | '9:16' | '1:1';
+  primaryEmotion: string;
+  emotionCategory: string;
+  lyricTranscript: string;
+  musicalAttributes: {
+    tempo: string;
+    mood: string;
+    vibe: string;
+    recommendedLighting: string;
+  };
+  scenes: PresentationScene[];
+  createdAt: string;
+  status: 'ready' | 'rendering' | 'completed';
+  videoExportUrl?: string;
+}
+
 
 

@@ -20,11 +20,14 @@ import {
   Volume2,
   VolumeX,
   Bell,
-  History
+  History,
+  Stamp
 } from 'lucide-react';
 import { StudioTab, Language } from '../types';
 import { useYouTubeAuth } from '../context/YouTubeAuthContext';
 import { useToast } from '../context/ToastContext';
+import { useWatermark } from '../context/WatermarkContext';
+import { AuthModal } from './AuthModal';
 
 interface NavbarProps {
   activeTab: StudioTab;
@@ -42,11 +45,20 @@ export const Navbar: React.FC<NavbarProps> = ({
   credits
 }) => {
   const isBn = lang === 'bn';
-  const { user, channel, isAuthenticated, isConnecting, signIn, signOut } = useYouTubeAuth();
+  const { user, channel, isAuthenticated, isConnecting, openAuthModal, signOut } = useYouTubeAuth();
   const { soundEnabled, setSoundEnabled } = useToast();
+  const { config: watermarkConfig, openModal: openWatermarkModal } = useWatermark();
   const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
 
   const tabs: { id: StudioTab; labelBn: string; labelEn: string; icon: React.ReactNode; badge?: string; badgeColor?: string }[] = [
+    {
+      id: 'audio-presentation',
+      labelBn: 'অডিও-টু-ভিডিও প্রেজেন্টেশন',
+      labelEn: 'Audio Video Presentation',
+      icon: <Sparkles className="w-4 h-4 text-pink-400" />,
+      badge: 'জেমিনি আবেগ ম্যাচিং',
+      badgeColor: 'bg-gradient-to-r from-pink-950 to-purple-950 text-pink-300 border-pink-700/60'
+    },
     {
       id: 'photo-music-video',
       labelBn: 'ছবি-টু-মিউজিক ভিডিও',
@@ -62,11 +74,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     {
       id: 'youtube-studio',
-      labelBn: 'ইউটিউব ওয়াচ ও স্টুডিও',
-      labelEn: 'YouTube Watch & Studio',
+      labelBn: 'ইউটিউব গান ও স্টুডিও',
+      labelEn: 'YouTube Music & Studio',
       icon: <Youtube className="w-4 h-4 text-red-500" />,
-      badge: isAuthenticated ? 'Connected' : 'Watch & Hub',
-      badgeColor: isAuthenticated ? 'bg-red-950 text-red-400 border-red-800' : 'bg-red-950/40 text-red-400 border-red-800/60'
+      badge: 'ডিসপ্লে-অফ অডিও',
+      badgeColor: 'bg-red-950 text-red-400 border-red-800'
     },
     {
       id: 'project-history',
@@ -131,16 +143,22 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-16">
           
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('photo-music-video')}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Sparkles className="w-5 h-5 text-white animate-pulse" />
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('audio-presentation')}>
+            <div className="relative w-10 h-10 rounded-xl overflow-hidden ring-1 ring-cyan-500/40 shadow-lg shadow-cyan-500/25 group-hover:ring-cyan-400 group-hover:shadow-cyan-400/40 transition-all duration-300 bg-slate-900">
+              <img
+                src="/src/assets/images/ai_video_logo_1793109699890.jpg"
+                alt="AI Video Studio Logo"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/10 pointer-events-none" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-cyan-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-cyan-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-purple-300 transition-colors">
                   AI Video Studio
                 </span>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/60 rounded-full">
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/60 rounded-full shadow-sm">
                   PRO
                 </span>
               </div>
@@ -183,10 +201,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* YouTube Login / Profile Button */}
             {!isAuthenticated ? (
               <button
-                onClick={signIn}
+                onClick={openAuthModal}
                 disabled={isConnecting}
-                title={isBn ? 'ইউটিউব অ্যাকাউন্ট দিয়ে লগইন করুন' : 'Sign in with YouTube'}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold border border-red-500/40 hover:border-red-500 shadow-md shadow-red-500/10 transition cursor-pointer"
+                title={isBn ? 'স্টুডিও অ্যাকাউন্টে লগইন করুন' : 'Sign in to Studio'}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold border border-cyan-500/40 hover:border-cyan-400 shadow-md shadow-cyan-500/10 transition cursor-pointer"
               >
                 {/* Google Icon */}
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
@@ -209,10 +227,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </svg>
                 <div className="flex items-center gap-1.5">
                   <Youtube className="w-3.5 h-3.5 text-red-500" />
-                  <span className="hidden sm:inline">
+                  <span>
                     {isConnecting
-                      ? isBn ? 'কানেক্টিং...' : 'Connecting...'
-                      : isBn ? 'ইউটিউব লগইন' : 'YouTube Login'}
+                      ? (isBn ? 'কানেক্টিং...' : 'Connecting...')
+                      : (isBn ? 'লগইন' : 'Sign In')}
                   </span>
                 </div>
               </button>
@@ -229,27 +247,27 @@ export const Navbar: React.FC<NavbarProps> = ({
                       'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'
                     }
                     alt={user?.displayName || 'User'}
-                    className="w-5 h-5 rounded-full object-cover ring-1 ring-red-500"
+                    className="w-5 h-5 rounded-full object-cover ring-1 ring-cyan-500"
                   />
-                  <span className="max-w-[100px] truncate font-semibold text-slate-200 hidden sm:inline">
-                    {channel?.title || user?.displayName || 'YouTube'}
+                  <span className="max-w-[110px] truncate font-semibold text-slate-200 hidden sm:inline">
+                    {user?.email ? user.email.split('@')[0] : (channel?.title || user?.displayName || 'Studio')}
                   </span>
                   <ChevronDown className="w-3 h-3 text-slate-400" />
                 </button>
 
                 {/* Dropdown Menu */}
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50 animate-fadeIn text-xs">
+                  <div className="absolute right-0 mt-2 w-60 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50 animate-fadeIn text-xs">
                     <div className="px-3 py-2 border-b border-slate-800">
                       <div className="font-bold text-white truncate">
                         {channel?.title || user?.displayName}
                       </div>
-                      <div className="text-[11px] text-slate-400 truncate">
-                        {channel?.customUrl || user?.email}
+                      <div className="text-[11px] text-cyan-400 font-mono truncate">
+                        {user?.email || channel?.customUrl || 'sf0745026@gmail.com'}
                       </div>
                       <div className="flex items-center gap-1 mt-1 text-[10px] text-emerald-400">
                         <CheckCircle2 className="w-3 h-3" />
-                        <span>{isBn ? 'ইউটিউব ভেরিফাইড সংযুক্ত' : 'YouTube Connected'}</span>
+                        <span>{isBn ? 'ভেরিফাইড স্টুডিও সংযুক্ত' : 'Verified Studio Connected'}</span>
                       </div>
                     </div>
 
@@ -262,6 +280,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <Youtube className="w-4 h-4 text-red-500" />
                       <span>{isBn ? 'ইউটিউব স্টুডিও ও চ্যানেল' : 'YouTube Studio & Hub'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        openAuthModal();
+                      }}
+                      className="w-full px-3 py-2 text-left text-cyan-300 hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{isBn ? 'অ্যাকাউন্ট পরিবর্তন / সুইচ' : 'Switch / Change Account'}</span>
                     </button>
 
                     <button
@@ -306,6 +335,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </button>
 
+            {/* Watermark Customizer Button */}
+            <button
+              onClick={openWatermarkModal}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition border cursor-pointer ${
+                watermarkConfig.enabled
+                  ? 'bg-cyan-950/70 hover:bg-cyan-900/80 text-cyan-300 border-cyan-700/60 shadow-sm'
+                  : 'bg-slate-800/60 hover:bg-slate-700 text-slate-400 border-slate-700'
+              }`}
+              title={isBn ? 'ভিডিও ওয়াটারমার্ক সেটিংস' : 'Video Watermark Settings'}
+            >
+              <Stamp className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden lg:inline text-[11px] font-bold">
+                {isBn ? 'ওয়াটারমার্ক' : 'Watermark'}
+              </span>
+            </button>
+
             {/* Language Switcher */}
             <button
               onClick={() => setLang(lang === 'bn' ? 'en' : 'bn')}
@@ -345,6 +390,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           })}
         </div>
       </div>
+      <AuthModal lang={lang} />
     </header>
   );
 };

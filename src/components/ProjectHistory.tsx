@@ -27,12 +27,91 @@ import {
   FileText,
   Smartphone,
   Monitor,
-  Square
+  Square,
+  ArrowUpDown
 } from 'lucide-react';
 import { Language, VideoJob, StudioTab } from '../types';
 import { fetchAllProjectHistory, deleteJobFromFirestore } from '../services/firebase';
 import { useToast } from '../context/ToastContext';
 import { YouTubeUploadModal } from './YouTubeUploadModal';
+
+export type SortOption = 
+  | 'date-desc'
+  | 'date-asc'
+  | 'duration-desc'
+  | 'duration-asc'
+  | 'resolution-desc'
+  | 'resolution-asc';
+
+// Helper to extract or infer duration in seconds
+export const getJobDurationSeconds = (job: VideoJob): number => {
+  if (typeof job.duration === 'number' && job.duration > 0) {
+    return job.duration;
+  }
+  // Try extracting from SRT content (last timestamp)
+  if (job.srtContent) {
+    const timeMatches = [...job.srtContent.matchAll(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/g)];
+    if (timeMatches.length > 0) {
+      const lastMatch = timeMatches[timeMatches.length - 1];
+      const hours = parseInt(lastMatch[1], 10);
+      const minutes = parseInt(lastMatch[2], 10);
+      const seconds = parseInt(lastMatch[3], 10);
+      const total = hours * 3600 + minutes * 60 + seconds;
+      if (total > 0) return total;
+    }
+  }
+  // Infer from scenes count (each scene is ~7 seconds in our pipeline)
+  if (job.scenes && job.scenes.length > 0) {
+    return job.scenes.length * 7;
+  }
+  // Check prompt or style for explicit duration tags (e.g. 15s, 30s, 60s)
+  const text = `${job.prompt} ${job.style || ''}`;
+  const match = text.match(/(\d+)\s*(?:s|sec|seconds)/i);
+  if (match) {
+    const val = parseInt(match[1], 10);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  // Default studio standard
+  return 20;
+};
+
+// Formatter: 28 => "00:28", 75 => "01:15"
+export const formatDuration = (seconds: number): string => {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
+// Helper to determine resolution label & numeric sort score
+export interface ResolutionInfo {
+  label: string;
+  score: number; // 4K = 3840, 1080p = 1920, 720p = 1280
+  badgeColor: string;
+}
+
+export const getJobResolutionInfo = (job: VideoJob): ResolutionInfo => {
+  if (job.resolution) {
+    const r = job.resolution.toLowerCase();
+    if (r.includes('4k') || r.includes('2160') || r.includes('uhd')) {
+      return { label: '4K (UHD)', score: 3840, badgeColor: 'text-amber-300 border-amber-500/30 bg-amber-500/10' };
+    }
+    if (r.includes('720') || r.includes('hd')) {
+      return { label: '720p (HD)', score: 1280, badgeColor: 'text-sky-300 border-sky-500/30 bg-sky-500/10' };
+    }
+    return { label: '1080p (FHD)', score: 1920, badgeColor: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' };
+  }
+
+  const combined = `${job.style || ''} ${job.prompt || ''}`.toLowerCase();
+  if (combined.includes('4k') || combined.includes('8k') || combined.includes('uhd')) {
+    return { label: '4K (UHD)', score: 3840, badgeColor: 'text-amber-300 border-amber-500/30 bg-amber-500/10' };
+  }
+  if (combined.includes('720p')) {
+    return { label: '720p (HD)', score: 1280, badgeColor: 'text-sky-300 border-sky-500/30 bg-sky-500/10' };
+  }
+
+  // Default standard studio resolution
+  return { label: '1080p (FHD)', score: 1920, badgeColor: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' };
+};
 
 interface ProjectHistoryProps {
   lang: Language;
@@ -53,6 +132,7 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedRatio, setSelectedRatio] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -146,6 +226,44 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
       return matchesSearch && matchesRatio && matchesStatus;
     });
   }, [projects, searchQuery, selectedRatio, selectedStatus]);
+
+  // Sorted projects by selected sorting option
+  const sortedProjects = useMemo(() => {
+    const list = [...filteredProjects];
+    list.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc': {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
+          return timeB - timeA;
+        }
+        case 'date-asc': {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
+          return timeA - timeB;
+        }
+        case 'duration-desc': {
+          return getJobDurationSeconds(b) - getJobDurationSeconds(a);
+        }
+        case 'duration-asc': {
+          return getJobDurationSeconds(a) - getJobDurationSeconds(b);
+        }
+        case 'resolution-desc': {
+          const scoreA = getJobResolutionInfo(a).score;
+          const scoreB = getJobResolutionInfo(b).score;
+          return scoreB - scoreA;
+        }
+        case 'resolution-asc': {
+          const scoreA = getJobResolutionInfo(a).score;
+          const scoreB = getJobResolutionInfo(b).score;
+          return scoreA - scoreB;
+        }
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [filteredProjects, sortBy]);
 
   const totalCreditsUsed = useMemo(() => {
     return projects.reduce((acc, curr) => acc + (curr.creditsUsed || 0), 0);
@@ -290,6 +408,24 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
             <option value="failed">{isBn ? 'ব্যর্থ (Failed)' : 'Failed'}</option>
           </select>
         </div>
+
+        {/* Sorting Dropdown Menu */}
+        <div className="flex items-center gap-2">
+          <ArrowUpDown className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+          <span className="text-xs text-slate-400 font-medium whitespace-nowrap">{isBn ? 'সাজান:' : 'Sort By:'}</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="px-3 py-2 rounded-xl bg-slate-950 border border-indigo-500/50 text-indigo-200 text-xs focus:outline-none focus:border-indigo-400 transition cursor-pointer font-medium shadow-sm shadow-indigo-500/10"
+          >
+            <option value="date-desc">{isBn ? '📅 তারিখ: নতুন থেকে পুরাতন' : '📅 Date: Newest First'}</option>
+            <option value="date-asc">{isBn ? '📅 তারিখ: পুরাতন থেকে নতুন' : '📅 Date: Oldest First'}</option>
+            <option value="duration-desc">{isBn ? '⏱️ সময়কাল: দীর্ঘ থেকে সংক্ষিপ্ত' : '⏱️ Duration: Longest First'}</option>
+            <option value="duration-asc">{isBn ? '⏱️ সময়কাল: সংক্ষিপ্ত থেকে দীর্ঘ' : '⏱️ Duration: Shortest First'}</option>
+            <option value="resolution-desc">{isBn ? '💎 রেজোলিউশন: সর্বোচ্চ (4K → 720p)' : '💎 Resolution: Highest First (4K → 720p)'}</option>
+            <option value="resolution-asc">{isBn ? '💎 রেজোলিউশন: সর্বনিম্ন (720p → 4K)' : '💎 Resolution: Lowest First (720p → 4K)'}</option>
+          </select>
+        </div>
       </div>
 
       {/* Projects List / Grid */}
@@ -300,7 +436,7 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
             {isBn ? 'ক্লাউড ফায়ারস্টোর থেকে প্রজেক্ট লোড হচ্ছে...' : 'Fetching your projects from Cloud Firestore...'}
           </p>
         </div>
-      ) : filteredProjects.length === 0 ? (
+      ) : sortedProjects.length === 0 ? (
         <div className="py-16 text-center rounded-3xl bg-slate-900/40 border border-slate-800/80 p-8 space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-slate-400 shadow-xl">
             <Film className="w-8 h-8 text-indigo-400" />
@@ -328,11 +464,13 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((job) => {
+          {sortedProjects.map((job) => {
             const isPlaying = playingVideoId === job.id;
             const isCompleted = job.status === 'completed';
             const isProcessing = job.status === 'processing';
             const isFailed = job.status === 'failed';
+            const durationSecs = getJobDurationSeconds(job);
+            const resInfo = getJobResolutionInfo(job);
 
             return (
               <div
@@ -361,16 +499,27 @@ export const ProjectHistory: React.FC<ProjectHistoryProps> = ({
                       </div>
                     )}
 
-                    {/* Aspect Ratio Badge */}
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700/80 text-[11px] font-bold text-slate-200">
-                      {job.aspectRatio === '9:16' ? (
-                        <Smartphone className="w-3 h-3 text-cyan-400" />
-                      ) : job.aspectRatio === '1:1' ? (
-                        <Square className="w-3 h-3 text-amber-400" />
-                      ) : (
-                        <Monitor className="w-3 h-3 text-indigo-400" />
-                      )}
-                      <span>{job.aspectRatio || '16:9'}</span>
+                    {/* Aspect Ratio, Duration & Resolution Badges */}
+                    <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-10">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700/80 text-[11px] font-bold text-slate-200">
+                        {job.aspectRatio === '9:16' ? (
+                          <Smartphone className="w-3 h-3 text-cyan-400" />
+                        ) : job.aspectRatio === '1:1' ? (
+                          <Square className="w-3 h-3 text-amber-400" />
+                        ) : (
+                          <Monitor className="w-3 h-3 text-indigo-400" />
+                        )}
+                        <span>{job.aspectRatio || '16:9'}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700/80 text-[11px] font-mono font-bold text-cyan-300" title={isBn ? 'ভিডিওর সময়কাল' : 'Video Duration'}>
+                        <Clock className="w-3 h-3 text-cyan-400" />
+                        <span>{formatDuration(durationSecs)}</span>
+                      </div>
+
+                      <div className={`px-2 py-0.5 rounded-full backdrop-blur-md border text-[10px] font-bold ${resInfo.badgeColor}`} title={isBn ? 'ভিডিও রেজোলিউশন' : 'Video Resolution'}>
+                        <span>{resInfo.label}</span>
+                      </div>
                     </div>
 
                     {/* Status Pill */}

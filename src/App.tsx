@@ -20,10 +20,15 @@ import { ProjectHistory } from './components/ProjectHistory';
 import { saveJobToFirestore } from './services/firebase';
 import { YouTubeAuthProvider } from './context/YouTubeAuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { MusicPlayerProvider } from './context/MusicPlayerContext';
+import { WatermarkProvider } from './context/WatermarkContext';
+import { WatermarkModal } from './components/WatermarkModal';
+import { GlobalMusicBar } from './components/GlobalMusicBar';
+import { AudioMusicPresentation } from './components/AudioMusicPresentation';
 import { Sparkles, Video, Search, Mic, Layers, Subtitles, ShieldCheck, Youtube, History } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<StudioTab>('photo-music-video');
+  const [activeTab, setActiveTab] = useState<StudioTab>('audio-presentation');
   const [lang, setLang] = useState<Language>('bn');
   const [credits, setCredits] = useState<number>(120);
   const [sharedSrt, setSharedSrt] = useState<string>('');
@@ -42,8 +47,10 @@ export default function App() {
 
   return (
     <YouTubeAuthProvider>
-      <ToastProvider lang={lang}>
-        <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+      <MusicPlayerProvider>
+        <ToastProvider lang={lang}>
+          <WatermarkProvider>
+            <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200 pb-16">
         {/* Top Navigation */}
         <Navbar
           activeTab={activeTab}
@@ -55,6 +62,13 @@ export default function App() {
 
         {/* Main Content Container */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {activeTab === 'audio-presentation' && (
+            <AudioMusicPresentation
+              lang={lang}
+              onNavigateTab={setActiveTab}
+            />
+          )}
+
           {activeTab === 'photo-music-video' && (
             <PhotoMusicVideo
               lang={lang}
@@ -97,7 +111,7 @@ export default function App() {
           )}
 
           {activeTab === 'video-to-video' && (
-            <VideoToVideo lang={lang} />
+            <VideoToVideo lang={lang} onNavigateTab={setActiveTab} />
           )}
 
           {activeTab === 'subtitles' && (
@@ -123,9 +137,14 @@ export default function App() {
         {/* Studio Footer */}
         <footer className="border-t border-slate-800/80 bg-[#0b0f19] py-8 text-xs text-slate-400">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center">
-                <Sparkles className="w-3.5 h-3.5 text-white" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg overflow-hidden ring-1 ring-cyan-500/40 shadow-sm shadow-cyan-500/20 bg-slate-900 flex-shrink-0">
+                <img
+                  src="/src/assets/images/ai_video_logo_1793109699890.jpg"
+                  alt="AI Video Studio Logo"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <span className="font-bold text-white">AI Video Studio</span>
               <span className="text-slate-500">|</span>
@@ -148,8 +167,16 @@ export default function App() {
             </div>
           </div>
         </footer>
+
+        {/* Global Persistent Floating Music Player Bar */}
+        <GlobalMusicBar lang={lang} />
+
+        {/* Global Watermark Customization Modal */}
+        <WatermarkModal lang={lang} />
       </div>
-      </ToastProvider>
+          </WatermarkProvider>
+        </ToastProvider>
+      </MusicPlayerProvider>
     </YouTubeAuthProvider>
   );
 }

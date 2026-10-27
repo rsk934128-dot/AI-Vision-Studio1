@@ -45,6 +45,8 @@ export const YouTubeStudio: React.FC<YouTubeStudioProps> = ({ lang, onNavigateTa
     isUploading,
     error,
     signIn,
+    loginAsCreator,
+    openAuthModal,
     connectDemoChannel,
     signOut,
     refreshChannel,
@@ -146,12 +148,23 @@ export const YouTubeStudio: React.FC<YouTubeStudioProps> = ({ lang, onNavigateTa
             {!isAuthenticated ? (
               <>
                 <button
-                  onClick={signIn}
+                  onClick={() => loginAsCreator('sf0745026@gmail.com', 'Creator (sf0745026)')}
+                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-600/30 transition cursor-pointer"
+                  title="Direct 1-Click Sign In (Bypasses iframe popup blocker)"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span>
+                    {isBn ? '১-ক্লিকে ক্রিয়েটর লগইন' : '1-Click Creator Login'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={openAuthModal}
                   disabled={isConnecting}
-                  className="flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shadow-xl hover:shadow-red-500/10 transition-all duration-200 border border-slate-200 disabled:opacity-50 cursor-pointer"
+                  className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-xl transition border border-slate-200 disabled:opacity-50 cursor-pointer"
                 >
                   {/* Official Google SVG Icon */}
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -171,22 +184,9 @@ export const YouTubeStudio: React.FC<YouTubeStudioProps> = ({ lang, onNavigateTa
                   </svg>
                   <span>
                     {isConnecting
-                      ? isBn
-                        ? 'কানেক্ট হচ্ছে...'
-                        : 'Connecting...'
-                      : isBn
-                      ? 'ইউটিউব চ্যানেল কানেক্ট করুন'
-                      : 'Sign in with Google'}
+                      ? (isBn ? 'কানেক্ট হচ্ছে...' : 'Connecting...')
+                      : (isBn ? 'অন্যান্য লগইন অপশন' : 'More Login Options')}
                   </span>
-                </button>
-
-                <button
-                  onClick={connectDemoChannel}
-                  className="flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition shadow-lg cursor-pointer"
-                  title="Test all features without Google OAuth"
-                >
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  <span>{isBn ? 'ডেমো চ্যানেল টেস্ট করুন' : 'Test Demo Channel'}</span>
                 </button>
               </>
             ) : (
@@ -257,7 +257,7 @@ export const YouTubeStudio: React.FC<YouTubeStudioProps> = ({ lang, onNavigateTa
             }`}
           >
             <Tv className="w-4 h-4 text-white" />
-            <span>{isBn ? 'ইউটিউব ভিডিও দেখুন (Watch Player)' : 'Watch YouTube In-App'}</span>
+            <span>{isBn ? 'গান সার্চ ও ডিসপ্লে-অফ অডিও' : 'Song Search & Screen-Off Audio'}</span>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
           </button>
 

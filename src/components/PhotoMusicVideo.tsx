@@ -465,6 +465,8 @@ export const PhotoMusicVideo: React.FC<PhotoMusicVideoProps> = ({ lang }) => {
           aspectRatio: newProject.aspectRatio,
           status: 'completed',
           progress: 100,
+          duration: 28,
+          resolution: newProject.aspectRatio === '9:16' ? '1080x1920 (FHD)' : '1080p (FHD)',
           videoUrl: newProject.videoUrl,
           voiceoverText: newProject.music.lyricsBn,
           srtContent: `1\n00:00:01,000 --> 00:00:07,000\n${newProject.music.lyricsBn}\n\n2\n00:00:07,500 --> 00:00:15,000\n${newProject.music.lyricsEn}`,

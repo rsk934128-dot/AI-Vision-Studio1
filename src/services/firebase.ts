@@ -39,6 +39,18 @@ async function testConnection() {
 
 testConnection();
 
+export function getActiveUserId(): string {
+  if (auth.currentUser?.uid) return auth.currentUser.uid;
+  try {
+    const raw = localStorage.getItem('ai_video_studio_auth_session');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.user?.uid) return parsed.user.uid;
+    }
+  } catch (_e) {}
+  return 'sf0745026_creator';
+}
+
 /**
  * Save a video job to Firestore in /users/{userId}/jobs/{jobId}
  * Also backs up to localStorage so users never lose their generated videos.
@@ -53,10 +65,7 @@ export async function saveJobToFirestore(job: VideoJob, customUserId?: string): 
     // quiet local storage quota errors
   }
 
-  const userId = customUserId || auth.currentUser?.uid;
-  if (!userId) {
-    return false;
-  }
+  const userId = customUserId || getActiveUserId();
 
   try {
     const jobDocRef = doc(db, 'users', userId, 'jobs', job.id);
@@ -75,10 +84,7 @@ export async function saveJobToFirestore(job: VideoJob, customUserId?: string): 
  * Fetch jobs for current user from Firestore
  */
 export async function fetchJobsFromFirestore(customUserId?: string): Promise<VideoJob[]> {
-  const userId = customUserId || auth.currentUser?.uid;
-  if (!userId) {
-    return [];
-  }
+  const userId = customUserId || getActiveUserId();
 
   try {
     const jobsColRef = collection(db, 'users', userId, 'jobs');
@@ -107,10 +113,7 @@ export async function deleteJobFromFirestore(jobId: string, customUserId?: strin
     // ignore
   }
 
-  const userId = customUserId || auth.currentUser?.uid;
-  if (!userId) {
-    return true;
-  }
+  const userId = customUserId || getActiveUserId();
 
   try {
     const jobDocRef = doc(db, 'users', userId, 'jobs', jobId);

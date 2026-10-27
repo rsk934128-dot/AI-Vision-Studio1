@@ -21,10 +21,12 @@ import {
 } from 'lucide-react';
 import { Language, VideoScript, VideoJob, StudioTab } from '../types';
 import { GenerativeVideoPlayer } from './GenerativeVideoPlayer';
+import { VideoPreviewPlayer, PreviewClipItem } from './VideoPreviewPlayer';
 import { YouTubeUploadModal } from './YouTubeUploadModal';
 import { VideoRenderProgressIndicator } from './VideoRenderProgressIndicator';
 import { useToast } from '../context/ToastContext';
 import { safeParseResponse } from '../utils/apiClient';
+import { saveJobToFirestore } from '../services/firebase';
 
 interface TextToVideoProps {
   lang: Language;
@@ -64,6 +66,49 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [apiKeyNotice, setApiKeyNotice] = useState<string | null>(null);
   const [showYouTubeModal, setShowYouTubeModal] = useState<boolean>(false);
+  const [selectedClipIndex, setSelectedClipIndex] = useState<number>(0);
+  const [playerViewMode, setPlayerViewMode] = useState<'preview-player' | 'canvas-engine'>('preview-player');
+
+  // Preview clips derived from storyboard or prompt
+  const defaultStoryboardScenes = [
+    { sceneNumber: 1, timestamp: '00:00 - 00:07', visualPrompt: prompt || 'মহাকাশচারী মঙ্গল গ্রহের প্রান্তরে হাঁটছে, চারপাশে নিয়ন আলো', narration: 'ভিডিওর প্রথম দৃশ্যে ফুটে উঠছে গল্পের মূল আকর্ষণ ও আবহ।', bgmStyle: 'Cinematic Ambient' },
+    { sceneNumber: 2, timestamp: '00:07 - 00:15', visualPrompt: 'বায়োলুমিনেসেন্ট লাল বালি ও নিয়ন ড্রোন উড়ন্ত ফ্রেম', narration: 'কাছ থেকে লক্ষ্য করলে প্রতিটি সূক্ষ্ম ডিটেইল স্পষ্ট হয়ে ওঠে।', bgmStyle: 'Synthwave Pulse' },
+    { sceneNumber: 3, timestamp: '00:15 - 00:23', visualPrompt: 'প্যানোরামিক ভিউ ও লাল পর্বতমালার ওপর উজ্জ্বল তারাখচিত আকাশ', narration: 'দৃশ্যটি যখন পূর্ণরূপে প্রকাশিত হয়, তখন কল্পনা বাস্তবে রূপ নেয়।', bgmStyle: 'Deep Ambient' },
+    { sceneNumber: 4, timestamp: '00:23 - 00:30', visualPrompt: 'মঙ্গল গ্রহের প্রথম মানব বসতির প্রবেশদ্বারে পদচিহ্ন', narration: 'এমন আকর্ষণীয় ভিজ্যুয়াল নির্মাণের মাধ্যমে সমাপ্তি ঘটে।', bgmStyle: 'Epic Finale' }
+  ];
+
+  const previewClips: PreviewClipItem[] = (generatedScript?.scenes || defaultStoryboardScenes).map((sc, i) => ({
+    id: `scene-clip-${i + 1}`,
+    sceneNumber: sc.sceneNumber,
+    title: `Scene ${sc.sceneNumber}: ${sc.visualPrompt.slice(0, 22)}...`,
+    titleBn: `সিন ${sc.sceneNumber}: ${sc.visualPrompt.slice(0, 18)}...`,
+    duration: 7,
+    visualPrompt: sc.visualPrompt,
+    narration: sc.narration,
+    bgmStyle: sc.bgmStyle,
+    videoUrl: activeJob?.videoUrl || (
+      i === 0 ? '/videos/sample1.mp4' :
+      i === 1 ? '/videos/sample2.mp4' :
+      i === 2 ? '/videos/sample3.mp4' :
+      '/videos/shorts_9_16.mp4'
+    )
+  }));
+
+  const handleDownloadClipPreview = (url?: string) => {
+    const targetUrl = url || activeJob?.videoUrl || '/videos/sample1.mp4';
+    const a = document.createElement('a');
+    a.href = targetUrl;
+    a.download = `clip-preview-scene-${selectedClipIndex + 1}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    notifySuccess(
+      'Clip Download Started',
+      'Your preview clip is downloading.',
+      'ক্লিপ ডাউনলোড শুরু হয়েছে',
+      'প্রিভিউ ক্লিপটি সফলভাবে ডাউনলোড হচ্ছে।'
+    );
+  };
 
   // Generate Script using Gemini 3.8 Flash
   const handleGenerateScript = async () => {
@@ -150,6 +195,8 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
           prompt,
           style: selectedStyle,
           aspectRatio,
+          duration: parseInt(duration.replace('s', ''), 10) || 15,
+          resolution: selectedStyle.toLowerCase().includes('8k') || selectedStyle.toLowerCase().includes('4k') ? '4K (UHD)' : '1080p (FHD)',
           voiceoverText: currentVoiceover,
           customSrt: presetSrt,
           scenes: currentScenes,
@@ -183,6 +230,9 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
             if (pollData.job.status === 'completed' || pollData.job.status === 'failed') {
               clearInterval(pollInterval);
               setIsRendering(false);
+              if (pollData.job.status === 'completed') {
+                saveJobToFirestore(pollData.job);
+              }
             }
           }
         } catch (_e) {
@@ -511,82 +561,133 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
             />
           )}
 
-          {/* Video Preview Canvas Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-              <div className="flex items-center gap-2">
-                <Film className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-bold text-white">
-                  {isBn ? 'ভিডিও প্রিভিউ ও সিন্থেসিস ক্যানভাস' : 'Video Canvas & Preview'}
-                </h3>
+          {/* Video Preview & Canvas Mode Switcher Bar */}
+          <div className="flex items-center justify-between p-2 rounded-2xl bg-slate-900 border border-slate-800">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPlayerViewMode('preview-player')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  playerViewMode === 'preview-player'
+                    ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Film className="w-3.5 h-3.5" />
+                <span>{isBn ? 'ভিডিও ক্লিপ প্রিভিউ প্লেয়ার' : 'Clip Preview Player'}</span>
+              </button>
+
+              <button
+                onClick={() => setPlayerViewMode('canvas-engine')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  playerViewMode === 'canvas-engine'
+                    ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-md shadow-cyan-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isBn ? 'ক্যানভাস ইঞ্জিন' : 'Canvas Engine'}</span>
+              </button>
+            </div>
+
+            <span className="text-[11px] text-cyan-400 font-semibold hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-cyan-950 border border-cyan-800/60">
+              {isBn ? 'চূড়ান্ত করার আগে ক্লিপগুলো দেখুন' : 'Inspect Clips Before Finalizing'}
+            </span>
+          </div>
+
+          {/* Render Mode 1: New Dedicated VideoPreviewPlayer */}
+          {playerViewMode === 'preview-player' ? (
+            <VideoPreviewPlayer
+              mode="text-to-video"
+              lang={lang}
+              clips={previewClips}
+              activeClipIndex={selectedClipIndex}
+              onSelectClip={setSelectedClipIndex}
+              aspectRatio={aspectRatio}
+              onAspectRatioChange={setAspectRatio}
+              onFinalize={handleStartRender}
+              isFinalizing={isRendering}
+              onDownloadPreview={handleDownloadClipPreview}
+              onPublishToYouTube={() => setShowYouTubeModal(true)}
+              onSendToSubtitles={() => {
+                if (onNavigateTab) onNavigateTab('subtitles');
+              }}
+            />
+          ) : (
+            /* Render Mode 2: Generative Canvas Player Card */
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <div className="flex items-center gap-2">
+                  <Film className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-sm font-bold text-white">
+                    {isBn ? 'ভিডিও সিন্থেসিস ক্যানভাস' : 'Video Canvas Engine'}
+                  </h3>
+                </div>
+
+                {activeJob && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                    activeJob.status === 'completed'
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                      : 'bg-cyan-950 text-cyan-400 border border-cyan-800 animate-pulse'
+                  }`}>
+                    {activeJob.status}
+                  </span>
+                )}
               </div>
 
-              {activeJob && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                  activeJob.status === 'completed'
-                    ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                    : 'bg-cyan-950 text-cyan-400 border border-cyan-800 animate-pulse'
-                }`}>
-                  {activeJob.status}
-                </span>
-              )}
-            </div>
-
-            {/* Canvas Video Viewport & Generative Player */}
-            <div className="w-full">
-              {activeJob?.status === 'completed' || (!isRendering && generatedScript) ? (
-                <GenerativeVideoPlayer
-                  job={activeJob}
-                  script={generatedScript}
-                  aspectRatio={aspectRatio}
-                  lang={lang}
-                />
-              ) : isRendering ? (
-                <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center space-y-3 transition-all duration-300 ${
-                  aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
-                }`}>
-                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 animate-spin">
-                    <Loader2 className="w-6 h-6" />
-                  </div>
-                  <p className="text-xs font-bold text-white">
-                    {isBn ? 'মাল্টি-স্টেজ ভিডিও রেন্ডারিং ও সিন্থেসিস চলছে...' : 'Active Multi-Stage Pipeline Synthesis...'}
-                  </p>
-                  <p className="text-[11px] text-slate-400 max-w-xs">
-                    {isBn 
-                      ? 'উপরের প্রগ্রেস ইন্ডিকেটরে ফ্রেম ও অডিও সিন্থেসিসের রিয়েল-টাইম স্ট্যাটাস এবং FFmpeg লগ পর্যবেক্ষণ করুন।'
-                      : 'Watch the real-time stages and FFmpeg console above as the export renders.'}
-                  </p>
-                </div>
-              ) : (
-                <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-3 transition-all duration-300 ${
-                  aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
-                }`}>
-                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                    <Play className="w-6 h-6 fill-current" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-200">
-                      {isBn ? 'আপনার পছন্দের যেকোনো ভিডিও তৈরি করুন' : 'AI Video Synthesizer Ready'}
+              <div className="w-full">
+                {activeJob?.status === 'completed' || (!isRendering && generatedScript) ? (
+                  <GenerativeVideoPlayer
+                    job={activeJob}
+                    script={generatedScript}
+                    aspectRatio={aspectRatio}
+                    lang={lang}
+                  />
+                ) : isRendering ? (
+                  <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center space-y-3 transition-all duration-300 ${
+                    aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
+                  }`}>
+                    <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 animate-spin">
+                      <Loader2 className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs font-bold text-white">
+                      {isBn ? 'মাল্টি-স্টেজ ভিডিও রেন্ডারিং ও সিন্থেসিস চলছে...' : 'Active Multi-Stage Pipeline Synthesis...'}
                     </p>
-                    <p className="text-[11px] text-slate-400 max-w-xs mt-1">
+                    <p className="text-[11px] text-slate-400 max-w-xs">
                       {isBn 
-                        ? 'বিড়াল/পোষা প্রাণী, রান্না, রেসিং কার, শান্ত নদী-পাহাড়, ইসলামিক দৃশ্য বা টেক টিউটোরিয়াল—যেকোনো প্রম্পট দিলেই নিখুঁত ভিডিও তৈরি হবে।' 
-                        : 'Accurately synthesizes scenes matching any prompt with subtitles, voiceover and export.'}
+                        ? 'উপরের প্রগ্রেস ইন্ডিকেটরে ফ্রেম ও অডিও সিন্থেসিসের রিয়েল-টাইম স্ট্যাটাস এবং FFmpeg লগ পর্যবেক্ষণ করুন।'
+                        : 'Watch the real-time stages and FFmpeg console above as the export renders.'}
                     </p>
                   </div>
-                  <button
-                    onClick={handleStartRender}
-                    disabled={!prompt.trim()}
-                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-md shadow-cyan-600/30 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{isBn ? 'এখনই তৈরি করুন' : 'Generate Now'}</span>
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <div className={`relative rounded-xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-3 transition-all duration-300 ${
+                    aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[480px] mx-auto w-full max-w-[280px]' : aspectRatio === '1:1' ? 'aspect-square max-h-[440px] mx-auto' : 'aspect-video w-full'
+                  }`}>
+                    <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                      <Play className="w-6 h-6 fill-current" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-200">
+                        {isBn ? 'আপনার পছন্দের যেকোনো ভিডিও তৈরি করুন' : 'AI Video Synthesizer Ready'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 max-w-xs mt-1">
+                        {isBn 
+                          ? 'বিড়াল/পোষা প্রাণী, রান্না, রেসিং কার, শান্ত নদী-পাহাড়, ইসলামিক দৃশ্য বা টেক টিউটোরিয়াল—যেকোনো প্রম্পট দিলেই নিখুঁত ভিডিও তৈরি হবে।' 
+                          : 'Accurately synthesizes scenes matching any prompt with subtitles, voiceover and export.'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleStartRender}
+                      disabled={!prompt.trim()}
+                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-md shadow-cyan-600/30 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{isBn ? 'এখনই তৈরি করুন' : 'Generate Now'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-
-          </div>
+          )}
 
         </div>
 
