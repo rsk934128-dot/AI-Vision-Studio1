@@ -12,6 +12,7 @@ import {
   Sparkles, 
   Layers, 
   Film, 
+  Stamp, 
   Sliders, 
   Clock, 
   Smartphone, 
@@ -30,6 +31,7 @@ import {
   Info
 } from 'lucide-react';
 import { Language, VideoScriptScene, VideoJob } from '../types';
+import { useWatermark } from '../context/WatermarkContext';
 
 export interface PreviewClipItem {
   id: string;
@@ -88,6 +90,7 @@ export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
   onSendToSubtitles,
 }) => {
   const isBn = lang === 'bn';
+  const { config: watermarkConfig, openModal: openWatermarkModal } = useWatermark();
 
   // Video playback elements
   const mainVideoRef = useRef<HTMLVideoElement>(null);
@@ -613,6 +616,55 @@ export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
             )}
           </div>
         )}
+
+        {/* Customizable Live Video Watermark Overlay */}
+        {watermarkConfig.enabled && (
+          <div 
+            className={`absolute z-30 pointer-events-none transition-all flex items-center ${
+              watermarkConfig.position === 'top-left' ? 'top-3 left-3' :
+              watermarkConfig.position === 'top-right' ? 'top-3 right-3' :
+              watermarkConfig.position === 'bottom-left' ? 'bottom-3 left-3' :
+              watermarkConfig.position === 'bottom-right' ? 'bottom-3 right-3' :
+              watermarkConfig.position === 'bottom-center' ? 'bottom-3 left-1/2 -translate-x-1/2' :
+              'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
+            }`}
+            style={{ opacity: watermarkConfig.opacity }}
+          >
+            <div className={`flex items-center gap-2 ${
+              watermarkConfig.showBackgroundBadge 
+                ? 'px-2.5 py-1 rounded-xl bg-slate-950/80 border border-cyan-500/40 backdrop-blur-sm shadow-xl' 
+                : ''
+            }`}>
+              {(watermarkConfig.type === 'image' || watermarkConfig.type === 'both') && watermarkConfig.imageUrl && (
+                <div 
+                  className="rounded-lg overflow-hidden shrink-0 shadow-sm"
+                  style={{
+                    width: `${Math.max(16, Math.min(50, watermarkConfig.imageSize * 0.7))}px`,
+                    height: `${Math.max(16, Math.min(50, watermarkConfig.imageSize * 0.7))}px`,
+                  }}
+                >
+                  <img 
+                    src={watermarkConfig.imageUrl} 
+                    alt="Watermark" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              )}
+              {(watermarkConfig.type === 'text' || watermarkConfig.type === 'both') && watermarkConfig.text && (
+                <span 
+                  className="font-bold tracking-tight drop-shadow-md select-none"
+                  style={{
+                    color: watermarkConfig.textColor,
+                    fontSize: `${Math.max(10, Math.min(22, watermarkConfig.fontSize * 0.7))}px`,
+                  }}
+                >
+                  {watermarkConfig.text}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* INTERACTIVE CONTROLS BAR */}
@@ -721,6 +773,22 @@ export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
                 <span>{isBn ? 'ইউটিউব' : 'YouTube'}</span>
               </button>
             )}
+
+            {/* Watermark Quick Settings Button */}
+            <button
+              onClick={openWatermarkModal}
+              className={`p-2 rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+                watermarkConfig.enabled
+                  ? 'bg-cyan-950/70 border-cyan-500/50 text-cyan-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+              }`}
+              title={isBn ? 'ভিডিও ওয়াটারমার্ক সেটিংস' : 'Video Watermark Settings'}
+            >
+              <Stamp className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[10px] font-bold hidden sm:inline">
+                {isBn ? 'ওয়াটারমার্ক' : 'Watermark'}
+              </span>
+            </button>
 
             {onDownloadPreview && (
               <button

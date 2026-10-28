@@ -658,3 +658,6 @@ export const VideoRenderProgressIndicator: React.FC<VideoRenderProgressIndicator
     </div>
   );
 };
+
+export { VideoExportProgressIndicator } from './VideoExportProgressIndicator';
+export default VideoRenderProgressIndicator;

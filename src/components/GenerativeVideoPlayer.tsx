@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { VideoJob, VideoScript, VideoScriptScene, Language } from '../types';
 import { useWatermark } from '../context/WatermarkContext';
+import { VideoExportProgressIndicator } from './VideoExportProgressIndicator';
 
 interface GenerativeVideoPlayerProps {
   job: VideoJob | null;
@@ -587,6 +588,9 @@ export const GenerativeVideoPlayer: React.FC<GenerativeVideoPlayerProps> = ({
         ctx.restore();
       }
 
+      // Apply customizable watermark before frame completes and during video export recording
+      drawWatermarkOnCanvas(ctx, width, height);
+
       animationFrameId = requestAnimationFrame(renderFrame);
     };
 
@@ -595,7 +599,7 @@ export const GenerativeVideoPlayer: React.FC<GenerativeVideoPlayerProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [theme, scenes, currentSceneIndex, totalDuration]);
+  }, [theme, scenes, currentSceneIndex, totalDuration, drawWatermarkOnCanvas]);
 
   // Export & Download synthesized video via MediaRecorder
   const handleExportCustomVideo = async () => {
@@ -828,11 +832,25 @@ export const GenerativeVideoPlayer: React.FC<GenerativeVideoPlayerProps> = ({
           </p>
         </div>
 
+        {/* Watermark Settings Button */}
+        <button
+          onClick={openWatermarkModal}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+            watermarkConfig.enabled
+              ? 'bg-cyan-950/70 border-cyan-500/50 text-cyan-300'
+              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+          }`}
+          title={isBn ? 'ভিডিও ওয়াটারমার্ক সেটিংস' : 'Watermark Settings'}
+        >
+          <Stamp className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">{isBn ? 'ওয়াটারমার্ক' : 'Watermark'}</span>
+        </button>
+
         {/* Export / Download Custom Synthesized Video Button */}
         <button
           onClick={handleExportCustomVideo}
           disabled={isExporting}
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 flex items-center gap-1.5 transition disabled:opacity-50"
+          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />
           <span>
@@ -842,6 +860,24 @@ export const GenerativeVideoPlayer: React.FC<GenerativeVideoPlayerProps> = ({
           </span>
         </button>
       </div>
+
+      {/* Real-Time Video Rendering & Export Pipeline Progress Indicator */}
+      <VideoExportProgressIndicator
+        isExporting={isExporting}
+        progress={exportProgress}
+        title={(job?.prompt || 'AI Generative Scene').slice(0, 45)}
+        duration={totalDuration || 15}
+        fps={30}
+        resolution={aspectRatio === '16:9' ? '1280x720' : aspectRatio === '9:16' ? '720x1280' : '1080x1080'}
+        format="WebM (VP9)"
+        hasWatermark={watermarkConfig.enabled}
+        onCancel={() => {
+          setIsExporting(false);
+          setExportProgress(0);
+        }}
+        lang={lang}
+        allowFloatingMinimize={true}
+      />
 
     </div>
   );

@@ -1854,6 +1854,22 @@ app.post('/api/shurjopay/resend-email', (req: Request, res: Response) => {
 // AUDIO-TO-VIDEO PRESENTATION & EMOTION MATCHING (Gemini 3.5 Transcribe & Gemini 3.8 Flash)
 // ==========================================
 const CURATED_PRESENTATION_IMAGES: Record<string, string[]> = {
+  commercial_jingle: [
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=1600&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1600&auto=format&fit=crop&q=85',
+  ],
+  dj_party: [
+    'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1600&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1600&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1600&auto=format&fit=crop&q=85',
+  ],
+  festive_bengal: [
+    'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1600&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1600&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&auto=format&fit=crop&q=85',
+  ],
   rainy_window: [
     'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=1600&auto=format&fit=crop&q=85',
     'https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?w=1600&auto=format&fit=crop&q=85',
@@ -2026,73 +2042,220 @@ Respond ONLY with raw JSON:
     // Default intelligent fallback if Gemini JSON wasn't parsed or returned
     if (!generatedPlan || !Array.isArray(generatedPlan.scenes) || generatedPlan.scenes.length === 0) {
       const step = Math.max(8, Math.floor(totalSeconds / 4));
-      generatedPlan = {
-        title: title || 'হৃদয় ছোঁয়া সুর ও কবিতা',
-        artist: artist || 'বাংলার সঙ্গীত ও সুরের মেলবন্ধন',
-        primaryEmotion: 'গভীর প্রেম ও নস্টালজিক বিষাদ (Soulful Romance & Nostalgia)',
-        emotionCategory: 'romantic_nostalgia',
-        lyricTranscript: lyricsInput || 'মেঘের ডানা মেলে মন চলে যায় অচিন কোনো দেশে,\nস্মৃতির পাতায় লেখা তোমার নাম ভেসে ওঠে বাতাসে।\nবৃষ্টিভেজা পথের বাঁকে খুঁজি সেই হারানো সুর,\nযে সুর আমায় নিয়ে যায় অচিনপুর বহুদূর...',
-        musicalAttributes: {
-          tempo: 'ধীর ও মিষ্টি সুরেলা (68 BPM Soulful)',
-          mood: 'Melancholic, Tender & Cinematic',
-          vibe: 'Warm Acoustic Flute & Acoustic Strings',
-          recommendedLighting: 'Golden Twilight Haze & Soft Rainy Bokeh',
-        },
-        scenes: [
-          {
-            sceneNumber: 1,
-            timeStart: 0,
-            timeEnd: Math.min(step, totalSeconds),
-            timestampLabel: `00:00 - 00:${String(Math.min(step, totalSeconds)).padStart(2, '0')}`,
-            lyricsLine: 'মেঘের ডানা মেলে মন চলে যায় অচিন কোনো দেশে...',
-            emotionalTone: 'নীরব সূচনা ও দূর সীমানায় হারিয়ে যাওয়া মন',
-            sceneTitle: 'কুয়াশাচ্ছন্ন নদীর ঘাট ও গোধূলির আলো',
-            visualPrompt: 'Cinematic wide shot of misty riverbanks at sunset with golden reflections on water and traditional wooden boat, ultra-realistic 8k',
-            cameraMotion: 'ken-burns-in',
-            particleOverlay: 'fog',
-            curatedTheme: 'sunset_river',
+      const combinedStr = `${title} ${lyricsInput} ${stylePreference}`.toLowerCase();
+
+      const isCommercialOrJingle = 
+        combinedStr.includes('হোটেল') || 
+        combinedStr.includes('শেখ ফরিদ') || 
+        combinedStr.includes('খাবার') || 
+        combinedStr.includes('মাংস') || 
+        combinedStr.includes('ভাত') || 
+        combinedStr.includes('জিলাপি') || 
+        combinedStr.includes('রেস্তোরাঁ') || 
+        combinedStr.includes('বিজ্ঞাপন') || 
+        combinedStr.includes('অফার') || 
+        combinedStr.includes('স্টেশন') || 
+        combinedStr.includes('jingle') || 
+        combinedStr.includes('commercial') ||
+        combinedStr.includes('food');
+
+      const isDjParty = 
+        combinedStr.includes('ডিজে') || 
+        combinedStr.includes('dj') || 
+        combinedStr.includes('dance') || 
+        combinedStr.includes('নাচ') || 
+        combinedStr.includes('party');
+
+      const isBaulFolk = 
+        combinedStr.includes('বাউল') || 
+        combinedStr.includes('একতারা') || 
+        combinedStr.includes('অচিন পাখি') || 
+        combinedStr.includes('সুফি') || 
+        combinedStr.includes('লোকগীতি');
+
+      if (isCommercialOrJingle) {
+        generatedPlan = {
+          title: title || 'হোটেল আল শেখ ফরিদ ও রসালো খাবারের জাঁকজমক',
+          artist: artist || 'বিজ্ঞাপন ও জিঙ্গেল সঙ্গীত',
+          primaryEmotion: 'উৎসবমুখর আনন্দ ও সুস্বাদু খাবারের তৃপ্তি (Festive Commercial & Delicious Feast)',
+          emotionCategory: 'festive_commercial',
+          performanceStyle: 'jingle_presenter',
+          lyricTranscript: lyricsInput || 'মেইন গেটে আপনাদের স্বাগতম ভাই,\nহোটেল আল শেখ ফরিদে সেরা খাবারের নেই তো কোনো ক্ষয়।\nগরম গরম জিলাপি, কষা মাংস আর ধোঁয়া ওঠা ভাত,\nডিজে তালে মেতে উঠুন কাটবে দারুণ এই রাত...',
+          musicalAttributes: {
+            tempo: 'উদ্যমী ও দ্রুত ছন্দ (128 BPM Commercial Beat)',
+            mood: 'Celebratory, Upbeat & Welcoming',
+            vibe: 'Festive Bengali Jingle & Brass Horns',
+            recommendedLighting: 'Warm Restaurant Glow & Party Spotlights',
           },
-          {
-            sceneNumber: 2,
-            timeStart: step,
-            timeEnd: Math.min(step * 2, totalSeconds),
-            timestampLabel: `00:${String(step).padStart(2, '0')} - 00:${String(Math.min(step * 2, totalSeconds)).padStart(2, '0')}`,
-            lyricsLine: 'স্মৃতির পাতায় লেখা তোমার নাম ভেসে ওঠে বাতাসে...',
-            emotionalTone: 'গভীর বিরহ ও ফেলে আসা ভালোবাসার স্মৃতি',
-            sceneTitle: 'বৃষ্টিভেজা জানালার কাঁচ ও মোমবাতির আলো',
-            visualPrompt: 'Raindrops dripping down a window pane with cozy warm candle light reflecting in the glass, nostalgic ambiance, 35mm film still',
-            cameraMotion: 'slow-drift',
-            particleOverlay: 'rain',
-            curatedTheme: 'rainy_window',
+          scenes: [
+            {
+              sceneNumber: 1,
+              timeStart: 0,
+              timeEnd: Math.min(step, totalSeconds),
+              timestampLabel: `00:00 - 00:${String(Math.min(step, totalSeconds)).padStart(2, '0')}`,
+              lyricsLine: 'স্টেশন রোড মেইন গেটে আপনাদের স্বাগতম জানাই...',
+              emotionalTone: 'উদ্বোধনী শুভেচ্ছা ও উৎসবমুখর আপ্যায়ন',
+              sceneTitle: 'মেইন গেট ও হোটেলের বর্ণাঢ্য তোরণ',
+              visualPrompt: 'Illuminated grand entrance of a bustling luxury Bengali restaurant with warm welcome lights, festive neon signboard, cinematic 8k',
+              cameraMotion: 'ken-burns-in',
+              particleOverlay: 'bokeh',
+              curatedTheme: 'commercial_jingle',
+            },
+            {
+              sceneNumber: 2,
+              timeStart: step,
+              timeEnd: Math.min(step * 2, totalSeconds),
+              timestampLabel: `00:${String(step).padStart(2, '0')} - 00:${String(Math.min(step * 2, totalSeconds)).padStart(2, '0')}`,
+              lyricsLine: 'গরম গরম কষা মাংস আর ধোঁয়া ওঠা সাদা ভাত...',
+              emotionalTone: 'জিভে জল আনা লোভনীয় খাবারের আকর্ষণ',
+              sceneTitle: 'কষা মাংস ও রাজকীয় খাবারের আয়োজন',
+              visualPrompt: 'Mouthwatering steaming authentic Bengali mutton curry and fragrant white rice spread with rich culinary spices, warm food photography 8k',
+              cameraMotion: 'slow-drift',
+              particleOverlay: 'embers',
+              curatedTheme: 'commercial_jingle',
+            },
+            {
+              sceneNumber: 3,
+              timeStart: step * 2,
+              timeEnd: Math.min(step * 3, totalSeconds),
+              timestampLabel: `00:${String(step * 2).padStart(2, '0')} - 00:${String(Math.min(step * 3, totalSeconds)).padStart(2, '0')}`,
+              lyricsLine: 'মচমচে রসালো জিলাপি মুখে দিলেই পরান জুড়াবে...',
+              emotionalTone: 'মিষ্টান্নের মুগ্ধতা ও পারিবারিক আনন্দের মুহূর্ত',
+              sceneTitle: 'রসালো জিলাপি ও মিষ্টিমুখ',
+              visualPrompt: 'Golden crispy piping-hot jalebis sizzling in sweet sugar syrup with warm ambient bakery lighting, macro shot 8k',
+              cameraMotion: 'pan-right',
+              particleOverlay: 'bokeh',
+              curatedTheme: 'commercial_jingle',
+            },
+            {
+              sceneNumber: 4,
+              timeStart: step * 3,
+              timeEnd: totalSeconds,
+              timestampLabel: `00:${String(step * 3).padStart(2, '0')} - 00:${String(totalSeconds).padStart(2, '0')}`,
+              lyricsLine: 'ডিজে তালে মেতে উঠবে পুরো স্টেশন, সেরা খাবারের সেলিব্রেশন!',
+              emotionalTone: 'সর্বোচ্চ উল্লাস, অফার ও আনন্দের ধামাকা সমাপ্তি',
+              sceneTitle: 'ডিজে পার্টি ও অতিথিদের আনন্দময় সেলিব্রেশন',
+              visualPrompt: 'Joyful celebration with colorful stage lights, smiling customers, dynamic party atmosphere, cinema grade 8k',
+              cameraMotion: 'ken-burns-out',
+              particleOverlay: 'bokeh',
+              curatedTheme: 'dj_party',
+            },
+          ],
+        };
+      } else if (isDjParty) {
+        generatedPlan = {
+          title: title || 'ডিজে পার্টি ও ড্যান্স নাইট',
+          artist: artist || 'ডিজে ক্লাব বিটস',
+          primaryEmotion: 'উন্মাদনা ও ড্যান্স ফ্লোর ভাইব (High Energy DJ Dance)',
+          emotionCategory: 'party_dance',
+          performanceStyle: 'pop_dj_stage',
+          lyricTranscript: lyricsInput || 'ডিজে বাজাও তালে তালে নাচবে এবার সবাই...',
+          musicalAttributes: {
+            tempo: 'হাই এনার্জি বিটস (130 BPM Club)',
+            mood: 'Electric, Neon & Dynamic',
+            vibe: 'Synthesizer & Heavy Bass',
+            recommendedLighting: 'Neon Cyan & Magenta Lasers',
           },
-          {
-            sceneNumber: 3,
-            timeStart: step * 2,
-            timeEnd: Math.min(step * 3, totalSeconds),
-            timestampLabel: `00:${String(step * 2).padStart(2, '0')} - 00:${String(Math.min(step * 3, totalSeconds)).padStart(2, '0')}`,
-            lyricsLine: 'বৃষ্টিভেজা পথের বাঁকে খুঁজি সেই হারানো সুর...',
-            emotionalTone: 'অনুসন্ধিৎসু মন ও আবেগময় মেলোডি ক্লাইম্যাক্স',
-            sceneTitle: 'শরতের নির্জন মেঠোপথ ও সোনালী পাতা',
-            visualPrompt: 'Quiet rural lane carpeted with golden autumn leaves, sun rays filtering through lush canopy, poetic Bengali countryside, 8k cinematic',
-            cameraMotion: 'pan-right',
-            particleOverlay: 'leaves',
-            curatedTheme: 'village_autumn',
+          scenes: [
+            {
+              sceneNumber: 1,
+              timeStart: 0,
+              timeEnd: Math.min(step, totalSeconds),
+              timestampLabel: `00:00 - 00:${String(Math.min(step, totalSeconds)).padStart(2, '0')}`,
+              lyricsLine: 'ডিজে বাজাও তালে তালে নাচবে এবার পুরো আসর...',
+              emotionalTone: 'ড্যান্স ফ্লোরে প্রবেশের তীব্র উত্তেজনা',
+              sceneTitle: 'কনসার্ট স্টেজ ও নিয়ন লেজার লাইট',
+              visualPrompt: 'Ultra high-tech concert stage with pulsing cyan and pink lasers, cheering crowd silhouettes, 8k',
+              cameraMotion: 'ken-burns-in',
+              particleOverlay: 'stardust',
+              curatedTheme: 'dj_party',
+            },
+            {
+              sceneNumber: 2,
+              timeStart: step,
+              timeEnd: totalSeconds,
+              timestampLabel: `00:${String(step).padStart(2, '0')} - 00:${String(totalSeconds).padStart(2, '0')}`,
+              lyricsLine: 'সঙ্গীতের তালে তালে ছড়িয়ে পড়ুক রঙিন আলো...',
+              emotionalTone: 'সর্বোচ্চ ড্যান্স ও বিট ড্রপ ক্লাইম্যাক্স',
+              sceneTitle: 'নিয়ন ক্লাব ও আলোকচ্ছটা',
+              visualPrompt: 'Night club with sweeping colorful spotlights and dancing festival atmosphere, 8k',
+              cameraMotion: 'pan-left',
+              particleOverlay: 'stardust',
+              curatedTheme: 'dj_party',
+            }
+          ]
+        };
+      } else {
+        // Melodic Romantic / Folk standard
+        generatedPlan = {
+          title: title || 'হৃদয় ছোঁয়া সুর ও কবিতা',
+          artist: artist || 'বাংলার সঙ্গীত ও সুরের মেলবন্ধন',
+          primaryEmotion: 'গভীর প্রেম ও নস্টালজিক বিষাদ (Soulful Romance & Nostalgia)',
+          emotionCategory: 'romantic_nostalgia',
+          performanceStyle: isBaulFolk ? 'baul_folk_acoustic' : 'romantic_hero',
+          lyricTranscript: lyricsInput || 'মেঘের ডানা মেলে মন চলে যায় অচিন কোনো দেশে,\nস্মৃতির পাতায় লেখা তোমার নাম ভেসে ওঠে বাতাসে।\nবৃষ্টিভেজা পথের বাঁকে খুঁজি সেই হারানো সুর,\nযে সুর আমায় নিয়ে যায় অচিনপুর বহুদূর...',
+          musicalAttributes: {
+            tempo: 'ধীর ও মিষ্টি সুরেলা (68 BPM Soulful)',
+            mood: 'Melancholic, Tender & Cinematic',
+            vibe: 'Warm Acoustic Flute & Acoustic Strings',
+            recommendedLighting: 'Golden Twilight Haze & Soft Rainy Bokeh',
           },
-          {
-            sceneNumber: 4,
-            timeStart: step * 3,
-            timeEnd: totalSeconds,
-            timestampLabel: `00:${String(step * 3).padStart(2, '0')} - 00:${String(totalSeconds).padStart(2, '0')}`,
-            lyricsLine: 'যে সুর আমায় নিয়ে যায় অচিনপুর বহুদূর...',
-            emotionalTone: 'শান্তিময় সমাপ্তি ও তারার দেশে অনন্ত যাত্রা',
-            sceneTitle: 'তারকাখচিত অনন্ত আকাশ ও রাতের নিস্তব্ধতা',
-            visualPrompt: 'Breathtaking starry night sky with glowing milky way galaxy above silent rolling hills, serene cosmic tranquility, cinematic masterpiece',
-            cameraMotion: 'ken-burns-out',
-            particleOverlay: 'stardust',
-            curatedTheme: 'starry_sky',
-          },
-        ],
-      };
+          scenes: [
+            {
+              sceneNumber: 1,
+              timeStart: 0,
+              timeEnd: Math.min(step, totalSeconds),
+              timestampLabel: `00:00 - 00:${String(Math.min(step, totalSeconds)).padStart(2, '0')}`,
+              lyricsLine: 'মেঘের ডানা মেলে মন চলে যায় অচিন কোনো দেশে...',
+              emotionalTone: 'নীরব সূচনা ও দূর সীমানায় হারিয়ে যাওয়া মন',
+              sceneTitle: 'কুয়াশাচ্ছন্ন নদীর ঘাট ও গোধূলির আলো',
+              visualPrompt: 'Cinematic wide shot of misty riverbanks at sunset with golden reflections on water and traditional wooden boat, ultra-realistic 8k',
+              cameraMotion: 'ken-burns-in',
+              particleOverlay: 'fog',
+              curatedTheme: 'sunset_river',
+            },
+            {
+              sceneNumber: 2,
+              timeStart: step,
+              timeEnd: Math.min(step * 2, totalSeconds),
+              timestampLabel: `00:${String(step).padStart(2, '0')} - 00:${String(Math.min(step * 2, totalSeconds)).padStart(2, '0')}`,
+              lyricsLine: 'স্মৃতির পাতায় লেখা তোমার নাম ভেসে ওঠে বাতাসে...',
+              emotionalTone: 'গভীর বিরহ ও ফেলে আসা ভালোবাসার স্মৃতি',
+              sceneTitle: 'বৃষ্টিভেজা জানালার কাঁচ ও মোমবাতির আলো',
+              visualPrompt: 'Raindrops dripping down a window pane with cozy warm candle light reflecting in the glass, nostalgic ambiance, 35mm film still',
+              cameraMotion: 'slow-drift',
+              particleOverlay: 'rain',
+              curatedTheme: 'rainy_window',
+            },
+            {
+              sceneNumber: 3,
+              timeStart: step * 2,
+              timeEnd: Math.min(step * 3, totalSeconds),
+              timestampLabel: `00:${String(step * 2).padStart(2, '0')} - 00:${String(Math.min(step * 3, totalSeconds)).padStart(2, '0')}`,
+              lyricsLine: 'বৃষ্টিভেজা পথের বাঁকে খুঁজি সেই হারানো সুর...',
+              emotionalTone: 'অনুসন্ধিৎসু মন ও আবেগময় মেলোডি ক্লাইম্যাক্স',
+              sceneTitle: 'শরতের নির্জন মেঠোপথ ও সোনালী পাতা',
+              visualPrompt: 'Quiet rural lane carpeted with golden autumn leaves, sun rays filtering through lush canopy, poetic Bengali countryside, 8k cinematic',
+              cameraMotion: 'pan-right',
+              particleOverlay: 'leaves',
+              curatedTheme: 'village_autumn',
+            },
+            {
+              sceneNumber: 4,
+              timeStart: step * 3,
+              timeEnd: totalSeconds,
+              timestampLabel: `00:${String(step * 3).padStart(2, '0')} - 00:${String(totalSeconds).padStart(2, '0')}`,
+              lyricsLine: 'যে সুর আমায় নিয়ে যায় অচিনপুর বহুদূর...',
+              emotionalTone: 'শান্তিময় সমাপ্তি ও তারার দেশে অনন্ত যাত্রা',
+              sceneTitle: 'তারকাখচিত অনন্ত আকাশ ও রাতের নিস্তব্ধতা',
+              visualPrompt: 'Breathtaking starry night sky with glowing milky way galaxy above silent rolling hills, serene cosmic tranquility, cinematic masterpiece',
+              cameraMotion: 'ken-burns-out',
+              particleOverlay: 'stardust',
+              curatedTheme: 'starry_sky',
+            },
+          ],
+        };
+      }
     }
 
     // Attach curated high-resolution photography URLs
@@ -2111,6 +2274,7 @@ Respond ONLY with raw JSON:
       artist: generatedPlan.artist || artist,
       duration: totalSeconds,
       aspectRatio,
+      performanceStyle: generatedPlan.performanceStyle || 'jingle_presenter',
       primaryEmotion: generatedPlan.primaryEmotion || 'গভীর প্রেম ও সুরের আবেগ',
       emotionCategory: generatedPlan.emotionCategory || 'romantic',
       lyricTranscript: generatedPlan.lyricTranscript || lyricsInput,

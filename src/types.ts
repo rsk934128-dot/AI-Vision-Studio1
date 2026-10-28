@@ -303,6 +303,7 @@ export interface AudioPresentationProject {
   aspectRatio: '16:9' | '9:16' | '1:1';
   primaryEmotion: string;
   emotionCategory: string;
+  performanceStyle?: string;
   lyricTranscript: string;
   musicalAttributes: {
     tempo: string;

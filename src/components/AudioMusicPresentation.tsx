@@ -28,12 +28,25 @@ import {
   CloudRain,
   Flame,
   Sun,
-  Wind
+  Wind,
+  Stamp,
+  User,
+  Mic,
+  Smile,
+  Wand2
 } from 'lucide-react';
 import { Language, PresentationScene, AudioPresentationProject, StudioTab } from '../types';
 import { useToast } from '../context/ToastContext';
+import { useWatermark } from '../context/WatermarkContext';
 import { saveJobToFirestore } from '../services/firebase';
-import { AudioPresentationLowResPreview } from './AudioPresentationLowResPreview';
+import { ProcessingPreview } from './ProcessingPreview';
+import { VideoExportProgressIndicator } from './VideoExportProgressIndicator';
+import { 
+  drawPerformerChoreography, 
+  PERFORMANCE_STYLES, 
+  PerformanceStyle, 
+  detectPerformanceStyle 
+} from '../services/performerChoreography';
 
 interface AudioMusicPresentationProps {
   lang: Language;
@@ -49,10 +62,23 @@ interface AudioPreset {
   audioUrl: string;
   lyrics: string;
   defaultEmotion: string;
+  defaultStyle?: PerformanceStyle;
   descriptionBn: string;
 }
 
 const PRESET_TRACKS: AudioPreset[] = [
+  {
+    id: 'preset-hotel-farid-jingle',
+    title: 'হোটেল আল শেখ ফরিদ (জিঙ্গেল ও ধামাকা ডিজে গান)',
+    artist: 'হোটেল আল শেখ ফরিদ কমার্শিয়াল',
+    genre: 'Commercial Jingle & DJ',
+    duration: 48,
+    audioUrl: '/assets/aistudio/gemini_music__10__Presentation_54e91e1c.webm',
+    lyrics: 'স্টেশন রোড মেইন গেটে আপনাদের স্বাগতম ভাই,\nহোটেল আল শেখ ফরিদে সেরা খাবারের নেই তো কোনো ক্ষয়।\nগরম গরম জিলাপি, কষা মাংস আর ধোঁয়া ওঠা ভাত,\nডিজে তালে মেতে উঠুন কাটবে দারুণ এই রাত...',
+    defaultEmotion: 'উৎসবমুখর আনন্দ ও সুস্বাদু খাবারের তৃপ্তি',
+    defaultStyle: 'jingle_presenter',
+    descriptionBn: 'উদ্যমী বিজ্ঞাপন গান, রসালো জিলাপি, কষা মাংস ও ডিজে উৎসবমুখর স্টেজ পারফরম্যান্স।'
+  },
   {
     id: 'preset-rainy-flute',
     title: 'মেঘের পরে মেঘ জমেছে (বৃষ্টি ও বাঁশির সুর)',
@@ -62,6 +88,7 @@ const PRESET_TRACKS: AudioPreset[] = [
     audioUrl: 'https://cdn.freesound.org/previews/612/612610_5674468-lq.mp3',
     lyrics: 'মেঘের পরে মেঘ জমেছে আঁধার করে আসে,\nআমায় কেন বসিয়ে রাখিস একা দ্বারের পাশে।\nকাজের দিনে নানা কাজে থাকি নানা লোকের মাঝে,\nআজ আমি যে বসে আছি তোমার আশার আশে...',
     defaultEmotion: 'গভীর বিরহ ও বর্ষার নস্টালজিয়া',
+    defaultStyle: 'romantic_hero',
     descriptionBn: 'বৃষ্টিভেজা উদাস দুপুর, দূরের বাঁশির মিষ্টি তান ও গভীর অনুভূতির সুর।'
   },
   {
@@ -73,6 +100,7 @@ const PRESET_TRACKS: AudioPreset[] = [
     audioUrl: 'https://cdn.freesound.org/previews/456/456965_5121236-lq.mp3',
     lyrics: 'তুমি আমার প্রথম সকাল, সোনালী রোদের গান,\nহাজার তারার মাঝে তুমি আমার অভিমান।\nহাতে হাত রেখে হেঁটে যাবো অচিন দূর সীমানায়,\nযেথায় শুধু তোমার আমার ভালোবাসার ছোঁয়া পায়...',
     defaultEmotion: 'গভীর প্রেম ও মিষ্টি উচ্ছ্বাস',
+    defaultStyle: 'romantic_hero',
     descriptionBn: 'ভোরের নরম আলোয় হাত ধরে হাঁটার মতো মিষ্টি ও মায়াবী প্রেমের গান।'
   },
   {
@@ -84,6 +112,7 @@ const PRESET_TRACKS: AudioPreset[] = [
     audioUrl: 'https://cdn.freesound.org/previews/517/517726_7037-lq.mp3',
     lyrics: 'খাঁচার ভিতর অচিন পাখি কেমনে আসে যায়,\nধরতে পারলে মনোবেড়ি দিতাম পাখির পায়।\nআট কুঠুরি নয় দরজা আঁটা মধ্যে মধ্যে ঝরকা কাটা,\nতার উপরে সদর কোঠা আয়না মহল তায়...',
     defaultEmotion: 'আধ্যাত্মিক নিস্তব্ধতা ও অন্তর্নিহিত বৈরাগ্য',
+    defaultStyle: 'baul_folk_acoustic',
     descriptionBn: 'অন্তরাত্মার গভীর সুর, মাটির গন্ধ ও আধ্যাত্মিক ভাবাবেগে ভাসিয়ে দেওয়ার মতো গান।'
   },
   {
@@ -95,6 +124,7 @@ const PRESET_TRACKS: AudioPreset[] = [
     audioUrl: 'https://cdn.freesound.org/previews/538/538779_11504561-lq.mp3',
     lyrics: 'ধোঁয়া ওঠা কফির কাপে বিকেল গড়িয়ে যায়,\nপুরোনো গানের চেনা কলি মনে পড়ে যায়।\nশহরের বুকে নিয়ন আলো জ্বলে ওঠার ক্ষণে,\nএকলা মনের হাজার কথা জমা থাকে মনে...',
     defaultEmotion: 'শহুরে একাকীত্ব ও শান্ত নস্টালজিয়া',
+    defaultStyle: 'lofi_chill',
     descriptionBn: 'ক্যাফের কাঁচের জানালায় বৃষ্টি দেখা আর পুরোনো স্মৃতির কথা মনে পড়ার প্রশান্তিময় সুর।'
   }
 ];
@@ -105,6 +135,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
 }) => {
   const isBn = lang === 'bn';
   const { addToast } = useToast();
+  const { config: watermarkConfig, openModal: openWatermarkModal, drawWatermarkOnCanvas } = useWatermark();
 
   // Input states
   const [selectedPresetId, setSelectedPresetId] = useState<string>('preset-rainy-flute');
@@ -139,6 +170,11 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
   const [isExportingVideo, setIsExportingVideo] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<number>(0);
 
+  // Performer & Acting System states
+  const [performanceStyle, setPerformanceStyle] = useState<PerformanceStyle>('jingle_presenter');
+  const [showPerformer, setShowPerformer] = useState<boolean>(true);
+  const [autoDetectStyle, setAutoDetectStyle] = useState<boolean>(true);
+
   // Refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -146,6 +182,10 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const particlesRef = useRef<any[]>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const exportTimerRef = useRef<any>(null);
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const lastLoadedImgRef = useRef<HTMLImageElement | null>(null);
 
   // Generation stages configuration
   const STAGES = [
@@ -193,6 +233,12 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
     setAudioDuration(preset.duration);
     setCurrentTime(0);
     setIsPlaying(false);
+
+    if (preset.defaultStyle) {
+      setPerformanceStyle(preset.defaultStyle);
+    } else {
+      setPerformanceStyle(detectPerformanceStyle(preset.title, preset.lyrics));
+    }
   };
 
   // Custom audio file upload
@@ -200,7 +246,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|m4a|aac|ogg)$/i)) {
+    if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|m4a|aac|ogg|webm)$/i)) {
       addToast({
         type: 'error',
         title: isBn ? 'ভুল ফাইল ফরম্যাট' : 'Invalid File Format',
@@ -222,12 +268,31 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
     setSongTitle(cleanedName);
     setArtistName(isBn ? 'আপলোডকৃত সঙ্গীত শিল্পী' : 'Uploaded Artist');
 
+    // Auto-detect performance style according to song name/genre
+    const detectedStyle = detectPerformanceStyle(cleanedName, lyricsInput);
+    setPerformanceStyle(detectedStyle);
+
     addToast({
       type: 'success',
       title: isBn ? 'অডিও ফাইল লোড হয়েছে' : 'Audio Loaded',
       message: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`
     });
   };
+
+  // Pre-load scene images into memory cache to eliminate blank dark screens
+  useEffect(() => {
+    if (!project || !project.scenes) return;
+    project.scenes.forEach((scene) => {
+      if (scene.imageUrl) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = scene.imageUrl;
+        img.onload = () => {
+          imageCacheRef.current.set(scene.imageUrl, img);
+        };
+      }
+    });
+  }, [project]);
 
   // Sync active scene based on currentTime
   useEffect(() => {
@@ -316,20 +381,31 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
       ctx.clearRect(0, 0, width, height);
 
       const activeScene = project?.scenes[activeSceneIndex];
-      const imgSrc = activeScene?.imageUrl || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&auto=format&fit=crop&q=85';
+      const imgSrc = activeScene?.imageUrl || (performanceStyle === 'jingle_presenter'
+        ? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&auto=format&fit=crop&q=85'
+        : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&auto=format&fit=crop&q=85');
 
-      if (imgSrc !== loadedSrc) {
+      // Check pre-cache first to eliminate blank dark screens
+      const cached = imageCacheRef.current.get(imgSrc);
+      if (cached && cached.complete && cached.naturalWidth > 0) {
+        currentImg = cached;
+        lastLoadedImgRef.current = cached;
+      } else if (imgSrc !== loadedSrc) {
         loadedSrc = imgSrc;
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.src = imgSrc;
         img.onload = () => {
           currentImg = img;
+          lastLoadedImgRef.current = img;
+          imageCacheRef.current.set(imgSrc, img);
         };
       }
 
+      const imgToDraw = currentImg || lastLoadedImgRef.current;
+
       // Draw background image with Ken Burns motion
-      if (currentImg && currentImg.complete) {
+      if (imgToDraw && imgToDraw.complete && imgToDraw.naturalWidth > 0) {
         const sceneDuration = activeScene ? (activeScene.timeEnd - activeScene.timeStart) : 10;
         const sceneElapsed = activeScene ? Math.max(0, currentTime - activeScene.timeStart) : (currentTime % 10);
         const progress = Math.min(1, Math.max(0, sceneElapsed / (sceneDuration || 1)));
@@ -342,27 +418,45 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         ctx.save();
         ctx.translate(width / 2 + driftX, height / 2 + driftY);
         ctx.scale(scale, scale);
-        ctx.drawImage(currentImg, -width / 2, -height / 2, width, height);
+        ctx.drawImage(imgToDraw, -width / 2, -height / 2, width, height);
         ctx.restore();
 
         // Dark gradient vignette overlay
         const vignette = ctx.createLinearGradient(0, 0, 0, height);
-        vignette.addColorStop(0, 'rgba(10, 15, 30, 0.4)');
-        vignette.addColorStop(0.5, 'rgba(10, 15, 30, 0.15)');
-        vignette.addColorStop(1, 'rgba(10, 15, 30, 0.75)');
+        vignette.addColorStop(0, 'rgba(10, 15, 30, 0.45)');
+        vignette.addColorStop(0.5, 'rgba(10, 15, 30, 0.2)');
+        vignette.addColorStop(1, 'rgba(10, 15, 30, 0.85)');
         ctx.fillStyle = vignette;
         ctx.fillRect(0, 0, width, height);
       } else {
-        // Fallback gradient
-        const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-        bgGrad.addColorStop(0, '#0f172a');
-        bgGrad.addColorStop(1, '#1e1b4b');
+        // High-fidelity procedural stage backdrop (never a blank dark void!)
+        const bgGrad = ctx.createRadialGradient(
+          width * 0.5, height * 0.4, 20,
+          width * 0.5, height * 0.5, width * 0.8
+        );
+        if (performanceStyle === 'jingle_presenter') {
+          bgGrad.addColorStop(0, '#3b1204');
+          bgGrad.addColorStop(0.6, '#1a0b1e');
+          bgGrad.addColorStop(1, '#070a14');
+        } else if (performanceStyle === 'pop_dj_stage') {
+          bgGrad.addColorStop(0, '#042838');
+          bgGrad.addColorStop(0.6, '#130424');
+          bgGrad.addColorStop(1, '#02050e');
+        } else if (performanceStyle === 'baul_folk_acoustic') {
+          bgGrad.addColorStop(0, '#2e1905');
+          bgGrad.addColorStop(0.6, '#180c04');
+          bgGrad.addColorStop(1, '#04070e');
+        } else {
+          bgGrad.addColorStop(0, '#1c0c24');
+          bgGrad.addColorStop(0.6, '#0d1326');
+          bgGrad.addColorStop(1, '#040711');
+        }
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, width, height);
       }
 
       // Draw Atmospheric Particles (Rain / Bokeh / Embers)
-      const particleType = activeScene?.particleOverlay || 'bokeh';
+      const particleType = activeScene?.particleOverlay || (performanceStyle === 'jingle_presenter' ? 'bokeh' : 'bokeh');
       const particles = particlesRef.current;
 
       for (let p of particles) {
@@ -394,30 +488,49 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
           ctx.arc(p.x, p.y, p.size * 1.2, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          // Dreamy bokeh / stardust
+          // Dreamy bokeh / golden festive sparkles
           p.y += p.speedY * 0.4;
           p.x += Math.sin(p.pulse) * 0.5;
           if (p.y > height) {
             p.y = 0;
             p.x = Math.random() * width;
           }
-          ctx.fillStyle = `rgba(254, 240, 138, ${currentOpacity * 0.6})`;
+          ctx.fillStyle = performanceStyle === 'jingle_presenter' 
+            ? `rgba(251, 191, 36, ${currentOpacity * 0.7})` 
+            : `rgba(254, 240, 138, ${currentOpacity * 0.6})`;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
+      // Draw Animated Character Actor & Choreography (Lip-sync, Gestures, Moving Spotlights)
+      if (showPerformer) {
+        drawPerformerChoreography(ctx, width, height, {
+          currentTime,
+          isPlaying,
+          performanceStyle,
+          lyricsLine: activeScene?.lyricsLine || '',
+          songTitle: project?.title || songTitle,
+          artistName: project?.artist || artistName,
+          aspectRatio,
+          primaryEmotion: project?.primaryEmotion
+        });
+      }
+
       // Sound-reactive audio equalizer wave at bottom
       if (isPlaying) {
         const barCount = 36;
         const barWidth = width / barCount;
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.fillStyle = performanceStyle === 'jingle_presenter' ? 'rgba(251, 191, 36, 0.45)' : 'rgba(56, 189, 248, 0.4)';
         for (let i = 0; i < barCount; i++) {
           const waveHeight = (Math.sin(currentTime * 8 + i * 0.5) * 0.5 + 0.5) * 28 + 6;
           ctx.fillRect(i * barWidth, height - waveHeight, barWidth - 3, waveHeight);
         }
       }
+
+      // Draw customizable watermark (text / logo / badge) on top layer before export
+      drawWatermarkOnCanvas(ctx, width, height);
 
       animationFrameRef.current = requestAnimationFrame(render);
     };
@@ -430,7 +543,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [project, activeSceneIndex, currentTime, isPlaying]);
+  }, [project, activeSceneIndex, currentTime, isPlaying, drawWatermarkOnCanvas, showPerformer, performanceStyle, aspectRatio, songTitle, artistName]);
 
   // Generous AI Generation Handler
   const handleGeneratePresentation = async () => {
@@ -502,6 +615,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
           duration: audioDuration,
           aspectRatio,
           stylePreference: visualStyle,
+          performanceStyle,
           lyricsInput
         })
       });
@@ -524,12 +638,17 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
       setReasoningLogs(prev => [
         ...prev,
         `[Audio-Visual Sync] অডিওর সাথে ফ্রেম-বাই-ফ্রেম সিঙ্ক্রোনাইজেশন লক করা হয়েছে...`,
+        `[Performer Acting] গানের আবেগ ও লিরিক্সের সাথে এআই চরিত্রের অভিনয় ও লিপ-সিঙ্ক প্রস্তুত!`,
         `[Presentation Assembly] ফুল ভিডিও প্রেজেন্টেশন রেন্ডার সফল!`
       ]);
 
       await new Promise(r => setTimeout(r, 1200));
 
       if (data.success && data.project) {
+        if (data.project.performanceStyle) {
+          setPerformanceStyle(data.project.performanceStyle as PerformanceStyle);
+        }
+
         const genProject: AudioPresentationProject = {
           ...data.project,
           audioUrl: activeAudioSrc,
@@ -660,6 +779,8 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         });
       };
 
+      mediaRecorderRef.current = recorder;
+
       // Play from beginning and record
       audio.currentTime = 0;
       setCurrentTime(0);
@@ -677,7 +798,8 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         } else {
           setExportProgress(Math.min(99, Math.round((audio.currentTime / audioDuration) * 100)));
         }
-      }, 500);
+      }, 400);
+      exportTimerRef.current = exportTimer;
 
     } catch (exportErr: any) {
       console.warn('MediaRecorder export fallback:', exportErr);
@@ -688,6 +810,30 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         message: isBn ? 'গান চলার সাথে সাথে স্ক্রিন ক্যাপচার চালু রয়েছে।' : 'Playback recording active.'
       });
     }
+  };
+
+  const handleCancelExport = () => {
+    if (exportTimerRef.current) {
+      clearInterval(exportTimerRef.current);
+      exportTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (_e) {}
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+    setIsExportingVideo(false);
+    setExportProgress(0);
+    addToast({
+      type: 'info',
+      title: isBn ? 'এক্সপোর্ট বাতিল করা হয়েছে' : 'Export Cancelled',
+      message: isBn ? 'ভিডিও এনকোডিং পাইপলাইন বন্ধ করা হয়েছে।' : 'Video rendering pipeline stopped.'
+    });
   };
 
   return (
@@ -931,6 +1077,84 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
               </div>
             </div>
 
+            {/* 3. Character Acting & Performance Style Section */}
+            <div className="rounded-2xl bg-slate-950/70 border border-purple-500/30 p-4 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-pink-400" />
+                  <span className="text-xs font-bold text-white">
+                    {isBn ? '৩. গানের সাথে চরিত্র অভিনয় ও স্টাইল' : '3. Character Acting & Performance Style'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const detected = detectPerformanceStyle(songTitle, lyricsInput, visualStyle);
+                      setPerformanceStyle(detected);
+                      addToast({
+                        type: 'info',
+                        title: isBn ? 'স্টাইল ডিটেক্টেড' : 'Style Detected',
+                        message: `${isBn ? 'গানের জন্য নির্বাচিত:' : 'Selected:'} ${PERFORMANCE_STYLES.find(s => s.id === detected)?.nameBn}`
+                      });
+                    }}
+                    className="px-2 py-1 rounded-lg bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 text-[10px] font-semibold text-purple-300 flex items-center gap-1 transition"
+                    title={isBn ? 'গান বিশ্লেষণ করে সঠিক পারফর্মার স্টাইল ঠিক করুন' : 'Auto-detect style from song'}
+                  >
+                    <Wand2 className="w-2.5 h-2.5 text-yellow-300" />
+                    <span>{isBn ? 'অটো সিলেক্ট' : 'Auto'}</span>
+                  </button>
+
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={showPerformer}
+                      onChange={(e) => setShowPerformer(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-pink-500 rounded cursor-pointer"
+                    />
+                    <span>{isBn ? 'অভিনয় সক্রিয়' : 'Actor On'}</span>
+                  </label>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {isBn
+                  ? 'গানের লিরিক্স ও ছন্দের সাথে এআই চরিত্র লিপ-সিঙ্ক, হাতের অঙ্গভঙ্গি ও নাচ করে অভিনয় করবে। প্রতিটি গানের স্টাইল আলাদা হবে।'
+                  : 'AI character acts, gestures, and lip-syncs dynamically to the lyrics and beat. Each style has unique stage and choreography.'}
+              </p>
+
+              {/* Performance Styles Grid */}
+              <div className="grid grid-cols-2 gap-2">
+                {PERFORMANCE_STYLES.map((style) => {
+                  const isSelected = performanceStyle === style.id;
+                  return (
+                    <button
+                      key={style.id}
+                      onClick={() => setPerformanceStyle(style.id)}
+                      className={`text-left p-2.5 rounded-xl border transition text-xs flex flex-col justify-between ${
+                        isSelected
+                          ? 'bg-gradient-to-br from-pink-950/60 to-purple-950/60 border-pink-500 text-white shadow-md shadow-pink-500/10'
+                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-base">{style.icon}</span>
+                        {isSelected && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
+                        )}
+                      </div>
+                      <div className="font-bold text-[11px] mt-1 text-slate-200">
+                        {isBn ? style.nameBn : style.nameEn}
+                      </div>
+                      <div className="text-[9px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
+                        {isBn ? style.descriptionBn : style.nameEn}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Generous Deep Thinking Mode Option */}
             <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-2">
               <div className="flex items-center justify-between">
@@ -1015,8 +1239,8 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
                 />
               </div>
 
-              {/* Real-time Low-Resolution AI Generated Animation Preview */}
-              <AudioPresentationLowResPreview
+              {/* Real-time Low-Resolution Placeholder Animation while Gemini 4 Argon processes in background */}
+              <ProcessingPreview
                 isGenerating={isGenerating}
                 currentStageIndex={currentStageIndex}
                 generationProgress={generationProgress}
@@ -1127,6 +1351,24 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
                         {project.primaryEmotion}
                       </span>
                     )}
+
+                    <button
+                      onClick={() => setShowPerformer(!showPerformer)}
+                      className={`pointer-events-auto px-2.5 py-1 rounded-full backdrop-blur-md border text-xs font-semibold flex items-center gap-1.5 shadow-lg transition cursor-pointer ${
+                        showPerformer
+                          ? 'bg-pink-950/80 border-pink-500/50 text-pink-200'
+                          : 'bg-black/60 border-white/10 text-slate-400 hover:text-white'
+                      }`}
+                      title={isBn ? 'অভিনয় চালু বা বন্ধ করুন' : 'Toggle Character Acting'}
+                    >
+                      <User className="w-3.5 h-3.5 text-pink-400" />
+                      <span>
+                        {PERFORMANCE_STYLES.find(s => s.id === performanceStyle)?.icon}{' '}
+                        {isBn 
+                          ? `${PERFORMANCE_STYLES.find(s => s.id === performanceStyle)?.nameBn || 'চরিত্র অভিনয়'}` 
+                          : `${PERFORMANCE_STYLES.find(s => s.id === performanceStyle)?.nameEn || 'Actor'}`}
+                      </span>
+                    </button>
                   </div>
 
                   <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-slate-300 text-xs font-mono">
@@ -1249,6 +1491,38 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
                   {/* Right side actions */}
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={() => setShowPerformer(!showPerformer)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                        showPerformer
+                          ? 'bg-pink-950/70 border-pink-500/50 text-pink-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                      }`}
+                      title={isBn ? 'গানের সাথে চরিত্র অভিনয় চালু বা বন্ধ করুন' : 'Toggle Character Acting'}
+                    >
+                      <User className="w-3.5 h-3.5 text-pink-400" />
+                      <span>{isBn ? 'চরিত্র অভিনয়' : 'Actor'}</span>
+                      {showPerformer && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
+                      )}
+                    </button>
+
+                    <button
+                      onClick={openWatermarkModal}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                        watermarkConfig.enabled
+                          ? 'bg-cyan-950/70 border-cyan-500/50 text-cyan-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                      }`}
+                      title={isBn ? 'ভিডিও ওয়াটারমার্ক সেটিংস' : 'Watermark Settings'}
+                    >
+                      <Stamp className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{isBn ? 'ওয়াটারমার্ক' : 'Watermark'}</span>
+                      {watermarkConfig.enabled && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      )}
+                    </button>
+
+                    <button
                       onClick={toggleFullscreen}
                       className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
                       title={isBn ? 'ফুলস্ক্রিন সিনেমা মোড' : 'Fullscreen'}
@@ -1344,6 +1618,21 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
 
         </div>
       </div>
+
+      {/* Real-time Video Rendering & Export Pipeline Progress Indicator */}
+      <VideoExportProgressIndicator
+        isExporting={isExportingVideo}
+        progress={exportProgress}
+        title={project ? `${project.title} - ${project.artist}` : songTitle}
+        duration={audioDuration || 45}
+        fps={30}
+        resolution={aspectRatio === '16:9' ? '1920x1080 (1080p Landscape)' : '1080x1920 (9:16 Shorts)'}
+        format="WebM (VP9 + Opus)"
+        hasWatermark={watermarkConfig.enabled}
+        onCancel={handleCancelExport}
+        lang={lang}
+        allowFloatingMinimize={true}
+      />
     </div>
   );
 };

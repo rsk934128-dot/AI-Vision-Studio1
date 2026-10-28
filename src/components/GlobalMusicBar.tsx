@@ -24,7 +24,11 @@ import {
   Repeat1, 
   ExternalLink,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  HelpCircle,
+  Headphones,
+  Smartphone,
+  Info
 } from 'lucide-react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { Language } from '../types';
@@ -68,6 +72,7 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
   const [isIframeReady, setIsIframeReady] = useState<boolean>(false);
   const [showQueueInModal, setShowQueueInModal] = useState<boolean>(false);
   const [showSleepMenu, setShowSleepMenu] = useState<boolean>(false);
+  const [showBackgroundHelpModal, setShowBackgroundHelpModal] = useState<boolean>(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Send commands to YouTube iframe via postMessage
@@ -86,6 +91,25 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
     } else {
       postIframeCommand('pauseVideo');
     }
+  }, [isPlaying]);
+
+  // Keep playback alive when user leaves the browser tab, minimizes app, or locks screen
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (isPlaying) {
+        postIframeCommand('playVideo');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    window.addEventListener('pagehide', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+      window.removeEventListener('pagehide', handleVisibility);
+    };
   }, [isPlaying]);
 
   useEffect(() => {
@@ -109,12 +133,14 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
 
   return (
     <>
-      {/* Hidden / Docked Persistent YouTube Embed (Always renders so audio never resets across tab changes) */}
+      {/* Persistent YouTube Embed: NEVER placed at -9999px or w-1 h-1 opacity-0 so mobile Chrome/Safari never pauses audio */}
       <div 
         className={
           playMode === 'video' && !isFullModalOpen
             ? 'fixed bottom-24 right-4 z-40 w-72 sm:w-80 aspect-video rounded-2xl overflow-hidden shadow-2xl border-2 border-red-500/60 bg-black transition-all animate-fadeIn'
-            : 'fixed -left-[9999px] -top-[9999px] w-1 h-1 opacity-0 pointer-events-none'
+            : isFullModalOpen && playMode === 'video'
+            ? 'fixed -left-[9999px] -top-[9999px] w-1 h-1 opacity-0 pointer-events-none'
+            : 'fixed bottom-1 left-1 z-0 w-32 h-20 rounded-xl overflow-hidden border border-indigo-500/10 bg-slate-950 pointer-events-none opacity-[0.02] transition-all'
         }
       >
         <iframe
@@ -124,7 +150,12 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           className="w-full h-full"
-          onLoad={() => setIsIframeReady(true)}
+          onLoad={() => {
+            setIsIframeReady(true);
+            if (isPlaying) {
+              setTimeout(() => postIframeCommand('playVideo'), 400);
+            }
+          }}
         />
         {playMode === 'video' && !isFullModalOpen && (
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-lg p-1">
@@ -267,6 +298,15 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
               }`}
             >
               {isWakeLockActive ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Background Audio Guide Button */}
+            <button
+              onClick={() => setShowBackgroundHelpModal(true)}
+              title={isBn ? 'ব্যাকগ্রাউন্ডে অবিরাম চালানোর নির্দেশিকা' : 'Background Audio Guide'}
+              className="p-1.5 sm:p-2 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-700/60 transition cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
             </button>
 
             {/* Expand into Full Player Modal */}
@@ -584,6 +624,100 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Background Playback & Screen-Off Guide Modal */}
+      {showBackgroundHelpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl p-5 sm:p-7 space-y-4 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                  <Headphones className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {isBn ? 'অ্যাপ থেকে বের হলেও যেভাবে গান চালু থাকবে' : 'How to Keep Music Playing in Background'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {isBn ? 'মোবাইল ব্রাউজার ও স্ক্রিন-অফ অডিও গাইড' : 'Mobile browser & screen-off playback guide'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBackgroundHelpModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-slate-300 max-h-[70vh] overflow-y-auto pr-1">
+              <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-600/40 space-y-1">
+                <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Info className="w-4 h-4 text-amber-400" />
+                  {isBn ? 'কেন স্বাভাবিকভাবে সাউন্ড বন্ধ হয়ে যায়?' : 'Why does audio stop normally?'}
+                </p>
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  {isBn 
+                    ? 'অ্যান্ড্রয়েড এবং আইফোনের ব্রাউজার (Chrome/Safari) ব্যাটারি ও মেমোরি বাঁচানোর জন্য অন্য কোনো অ্যাপে ঢুকলে বা ডিসপ্লে বন্ধ করলে স্বয়ংক্রিয়ভাবে ব্যাকগ্রাউন্ডের ওয়েব ভিডিও ও সাউন্ড সাময়িক পজ (Pause) করে দেয়।' 
+                    : 'Mobile browsers pause video tabs when you switch apps or turn off your screen to conserve battery and data.'}
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                <p className="font-bold text-white text-xs">
+                  {isBn ? '💡 অবিরাম গান চালু রাখার ৩টি সহজ পদ্ধতি:' : '💡 3 Easy Ways to Keep Audio Playing:'}
+                </p>
+
+                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-2 text-cyan-400 font-bold">
+                    <span className="w-5 h-5 rounded-full bg-cyan-600/30 flex items-center justify-center text-[11px]">১</span>
+                    <span>{isBn ? 'অডিও মোড (Audio Mode) সক্রিয় রাখুন' : 'Keep Audio Mode Selected'}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 pl-7">
+                    {isBn
+                      ? 'প্লেয়ারের "অডিও (Audio)" বাটন সিলেক্ট রাখুন। আমাদের সিস্টেমে ব্যাকগ্রাউন্ড অডিও ক্যারিয়ার এবং মিডিয়াসেশন যুক্ত করা আছে যা স্ক্রিন লক করলেও গান বন্ধ হতে দেয় না।'
+                      : 'Keep Audio mode active. The app will maintain an OS audio session with live lock screen controls.'}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-2 text-indigo-400 font-bold">
+                    <span className="w-5 h-5 rounded-full bg-indigo-600/30 flex items-center justify-center text-[11px]">২</span>
+                    <span>{isBn ? 'লক স্ক্রিন বা নোটিফিকেশন বার থেকে Play চাপুন' : 'Lock Screen & Notification Controls'}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 pl-7">
+                    {isBn
+                      ? 'ফোন লক করলে যদি গান থেমে যায়, আপনার ফোনের নোটিফিকেশন শেড বা লক স্ক্রিন দেখুন—সেখানে এই গানের থাম্বনেইল ও প্লে বাটন দেখা যাবে। সেখান থেকে সরাসরি Play চাপলে ব্যাকগ্রাউন্ডে গান চলবে।'
+                      : 'If your phone pauses, check the lock screen or swipe down notifications—tap Play to resume in background.'}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                    <span className="w-5 h-5 rounded-full bg-emerald-600/30 flex items-center justify-center text-[11px]">৩</span>
+                    <span>{isBn ? 'ফোনের স্ক্রিন অন রাখতে WakeLock চালু করুন' : 'Keep Screen Awake (WakeLock)'}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 pl-7">
+                    {isBn
+                      ? 'প্লেয়ারের সূর্য/চাঁদ (Sun/Moon) আইকন চাপুন। এটি ডিসপ্লে অটো-স্লিপ বন্ধ রাখবে যাতে গান একটানা শুনতে পারেন।'
+                      : 'Tap the Sun/Moon icon on the player bar to prevent your phone screen from timing out.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => setShowBackgroundHelpModal(false)}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs transition cursor-pointer shadow-lg shadow-cyan-600/30"
+                >
+                  {isBn ? 'বুঝেছি, ব্যাকগ্রাউন্ড মিউজিক উপভোগ করুন' : 'Got it, Enjoy Background Music'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

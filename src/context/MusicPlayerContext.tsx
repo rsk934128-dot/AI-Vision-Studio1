@@ -41,8 +41,53 @@ interface MusicPlayerContextType {
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
-// Base64 silent audio WAV data (valid 1-second silence loop)
-const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+// Continuous low-amplitude carrier audio for uninterrupted mobile/desktop background audio
+function createContinuousAudioCarrier(): HTMLAudioElement {
+  try {
+    const sampleRate = 8000;
+    const duration = 4;
+    const numFrames = sampleRate * duration;
+    const buffer = new ArrayBuffer(44 + numFrames * 2);
+    const view = new DataView(buffer);
+
+    const writeStr = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + numFrames * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // Mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    view.setUint32(40, numFrames * 2, true);
+
+    // 25 Hz very soft carrier wave to maintain OS audio focus without loud buzz
+    for (let i = 0; i < numFrames; i++) {
+      const sample = Math.round(Math.sin((2 * Math.PI * 25 * i) / sampleRate) * 80);
+      view.setInt16(44 + i * 2, sample, true);
+    }
+
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    const audio = new Audio(URL.createObjectURL(blob));
+    audio.loop = true;
+    audio.volume = 0.05;
+    return audio;
+  } catch (_e) {
+    const fallback = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+    fallback.loop = true;
+    fallback.volume = 0.05;
+    return fallback;
+  }
+}
 
 export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentTrack, setCurrentTrack] = useState<YouTubeTrack | null>(null);
@@ -60,23 +105,58 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('all');
 
-  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const carrierAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const carrierOscRef = useRef<OscillatorNode | null>(null);
+  const carrierGainRef = useRef<GainNode | null>(null);
   const wakeLockRef = useRef<any>(null);
   const timerIntervalRef = useRef<any>(null);
 
-  // Initialize background audio element
-  useEffect(() => {
-    const audio = new Audio(SILENT_AUDIO_URI);
-    audio.loop = true;
-    audio.volume = 0.01;
-    silentAudioRef.current = audio;
+  // Initialize Web Audio and carrier element for OS audio session retention
+  const ensureBackgroundAudioActive = useCallback(() => {
+    try {
+      if (!carrierAudioRef.current) {
+        carrierAudioRef.current = createContinuousAudioCarrier();
+      }
+      carrierAudioRef.current.play().catch(() => {});
 
-    return () => {
-      audio.pause();
-    };
+      // Web Audio API session unlock for Android AudioTrack & iOS CoreAudio
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioCtx();
+        }
+        if (audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume().catch(() => {});
+        }
+        if (!carrierOscRef.current && audioContextRef.current) {
+          const osc = audioContextRef.current.createOscillator();
+          const gain = audioContextRef.current.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(26, audioContextRef.current.currentTime);
+          gain.gain.setValueAtTime(0.001, audioContextRef.current.currentTime);
+          osc.connect(gain);
+          gain.connect(audioContextRef.current.destination);
+          osc.start();
+          carrierOscRef.current = osc;
+          carrierGainRef.current = gain;
+        }
+      }
+    } catch (err) {
+      console.warn('Background audio session initialization notice:', err);
+    }
   }, []);
 
-  // Update MediaSession API for Android/iOS Lock Screen Controls
+  const pauseBackgroundAudio = useCallback(() => {
+    try {
+      carrierAudioRef.current?.pause();
+      if (audioContextRef.current && audioContextRef.current.state === 'running') {
+        audioContextRef.current.suspend().catch(() => {});
+      }
+    } catch (_e) {}
+  }, []);
+
+  // Update MediaSession API for Android/iOS Lock Screen Controls and notification shade
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentTrack) return;
 
@@ -95,12 +175,12 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
       navigator.mediaSession.setActionHandler('play', () => {
         setIsPlaying(true);
-        silentAudioRef.current?.play().catch(() => {});
+        ensureBackgroundAudioActive();
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
         setIsPlaying(false);
-        silentAudioRef.current?.pause();
+        pauseBackgroundAudio();
       });
 
       navigator.mediaSession.setActionHandler('previoustrack', () => {
@@ -111,28 +191,38 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         nextTrack();
       });
 
+      navigator.mediaSession.setActionHandler('stop', () => {
+        setIsPlaying(false);
+        pauseBackgroundAudio();
+      });
+
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     } catch (e) {
       console.warn('MediaSession notice:', e);
     }
-  }, [currentTrack, isPlaying]);
+  }, [currentTrack, isPlaying, ensureBackgroundAudioActive, pauseBackgroundAudio]);
 
-  // Keep background audio active when tab is hidden or screen locks
+  // Keep background audio active when tab is hidden, screen locks, or user navigates away
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && isPlaying) {
-        // Phone screen turned off or user switched apps
-        if (silentAudioRef.current) {
-          silentAudioRef.current.play().catch(() => {});
+      if (isPlaying) {
+        ensureBackgroundAudioActive();
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'playing';
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handleVisibilityChange);
+    window.addEventListener('blur', handleVisibilityChange);
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handleVisibilityChange);
+      window.removeEventListener('blur', handleVisibilityChange);
     };
-  }, [isPlaying]);
+  }, [isPlaying, ensureBackgroundAudioActive]);
 
   // Sleep Timer Countdown
   useEffect(() => {
@@ -149,7 +239,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
           if (prev === null || prev <= 1) {
             clearInterval(timerIntervalRef.current);
             setIsPlaying(false);
-            silentAudioRef.current?.pause();
+            pauseBackgroundAudio();
             setSleepTimerMinutes(null);
             return null;
           }
@@ -163,7 +253,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [sleepTimerMinutes, isPlaying]);
+  }, [sleepTimerMinutes, isPlaying, pauseBackgroundAudio]);
 
   // Toggle Screen WakeLock
   const toggleWakeLock = useCallback(async () => {
@@ -192,9 +282,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     setIsMiniPlayerVisible(true);
     if (mode) setPlayModeState(mode);
 
-    if (silentAudioRef.current) {
-      silentAudioRef.current.play().catch(() => {});
-    }
+    ensureBackgroundAudioActive();
 
     if (immediatePlayList && immediatePlayList.length > 0) {
       const remaining = immediatePlayList.filter((t) => t.id !== track.id);
@@ -202,29 +290,29 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     setHistory((prev) => [track, ...prev.filter((p) => p.id !== track.id)].slice(0, 30));
-  }, []);
+  }, [ensureBackgroundAudioActive]);
 
   const togglePlay = useCallback(() => {
     setIsPlaying((prev) => {
       const next = !prev;
       if (next) {
-        silentAudioRef.current?.play().catch(() => {});
+        ensureBackgroundAudioActive();
       } else {
-        silentAudioRef.current?.pause();
+        pauseBackgroundAudio();
       }
       return next;
     });
-  }, []);
+  }, [ensureBackgroundAudioActive, pauseBackgroundAudio]);
 
   const pauseTrack = useCallback(() => {
     setIsPlaying(false);
-    silentAudioRef.current?.pause();
-  }, []);
+    pauseBackgroundAudio();
+  }, [pauseBackgroundAudio]);
 
   const resumeTrack = useCallback(() => {
     setIsPlaying(true);
-    silentAudioRef.current?.play().catch(() => {});
-  }, []);
+    ensureBackgroundAudioActive();
+  }, [ensureBackgroundAudioActive]);
 
   const nextTrack = useCallback(() => {
     if (queue.length > 0) {
