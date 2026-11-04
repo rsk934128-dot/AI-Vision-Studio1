@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { User } from 'firebase/auth';
 import { 
   signInWithYouTube, 
+  signInWithYouTubeRedirect,
   signOutFromYouTube, 
   initYouTubeAuth, 
   fetchYouTubeChannel, 
@@ -11,6 +12,12 @@ import {
   getCachedAccessToken
 } from '../services/youtubeAuth';
 import { YouTubeChannelProfile, YouTubeUploadedVideo } from '../types';
+
+export interface SavedGoogleAccount {
+  email: string;
+  name: string;
+  photoURL?: string;
+}
 
 interface YouTubeAuthContextType {
   user: User | null;
@@ -24,10 +31,13 @@ interface YouTubeAuthContextType {
   isUploading: boolean;
   error: string | null;
   isAuthModalOpen: boolean;
+  savedAccounts: SavedGoogleAccount[];
   openAuthModal: () => void;
   closeAuthModal: () => void;
   signIn: () => Promise<void>;
+  signInRedirect: () => Promise<void>;
   loginAsCreator: (email?: string, name?: string) => void;
+  removeSavedAccount: (email: string) => void;
   connectDemoChannel: () => void;
   signOut: () => Promise<void>;
   refreshChannel: () => Promise<void>;
@@ -41,6 +51,15 @@ interface YouTubeAuthContextType {
 
 const EMPTY_VIDEOS: YouTubeUploadedVideo[] = [];
 const STORAGE_AUTH_KEY = 'ai_video_studio_auth_session';
+const SAVED_ACCOUNTS_KEY = 'ai_video_studio_saved_google_accounts';
+
+const DEFAULT_SAVED_ACCOUNTS: SavedGoogleAccount[] = [
+  {
+    email: 'sf0745026@gmail.com',
+    name: 'Primary Creator (sf0745026)',
+    photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
+  }
+];
 
 const DEMO_CHANNEL: YouTubeChannelProfile = {
   id: 'UC_ai_video_studio_bd_official',
@@ -95,8 +114,40 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [error, setError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
+  const [savedAccounts, setSavedAccounts] = useState<SavedGoogleAccount[]>(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_ACCOUNTS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_e) {}
+    return DEFAULT_SAVED_ACCOUNTS;
+  });
+
   const openAuthModal = useCallback(() => setIsAuthModalOpen(true), []);
   const closeAuthModal = useCallback(() => setIsAuthModalOpen(false), []);
+
+  const persistSavedAccount = useCallback((newAccount: SavedGoogleAccount) => {
+    setSavedAccounts((prev) => {
+      const filtered = prev.filter((a) => a.email.toLowerCase() !== newAccount.email.toLowerCase());
+      const updated = [newAccount, ...filtered].slice(0, 10);
+      try {
+        localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(updated));
+      } catch (_e) {}
+      return updated;
+    });
+  }, []);
+
+  const removeSavedAccount = useCallback((emailToRemove: string) => {
+    setSavedAccounts((prev) => {
+      const updated = prev.filter((a) => a.email.toLowerCase() !== emailToRemove.toLowerCase());
+      try {
+        localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(updated));
+      } catch (_e) {}
+      return updated;
+    });
+  }, []);
 
   // Restore saved session from localStorage on initial mount
   useEffect(() => {
@@ -131,6 +182,15 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
         setUser(authUser);
         setAccessToken(token);
         setIsDemoMode(false);
+
+        if (authUser.email) {
+          persistSavedAccount({
+            email: authUser.email,
+            name: authUser.displayName || authUser.email.split('@')[0],
+            photoURL: authUser.photoURL || undefined
+          });
+        }
+
         try {
           const ch = await fetchYouTubeChannel(token, authUser);
           if (isMounted) {
@@ -186,7 +246,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       isMounted = false;
       unsubscribe();
     };
-  }, [isDemoMode]);
+  }, [isDemoMode, persistSavedAccount]);
 
   const loginAsCreator = useCallback((email?: string, name?: string) => {
     setError(null);
@@ -194,12 +254,15 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     const emailPrefix = targetEmail.split('@')[0] || 'creator';
     const targetName = name?.trim() || (targetEmail === 'sf0745026@gmail.com' ? 'Creator (sf0745026)' : `Creator (${emailPrefix})`);
     const targetUid = 'usr_' + targetEmail.replace(/[^a-zA-Z0-9]/g, '_');
+    const avatar = targetEmail === 'sf0745026@gmail.com'
+      ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
+      : `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(targetEmail)}`;
 
     const creatorUser = {
       uid: targetUid,
       displayName: targetName,
       email: targetEmail,
-      photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+      photoURL: avatar,
       emailVerified: true
     } as unknown as User;
 
@@ -209,9 +272,9 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       description: `Official AI Video Creator Channel for ${targetEmail}. Powered by Google Gemini & Firestore.`,
       customUrl: '@' + emailPrefix,
       thumbnails: {
-        default: { url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80' },
-        medium: { url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80' },
-        high: { url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800&auto=format&fit=crop&q=80' }
+        default: { url: avatar },
+        medium: { url: avatar },
+        high: { url: avatar }
       },
       statistics: {
         viewCount: '152400',
@@ -231,6 +294,12 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     setIsLoading(false);
     setIsAuthModalOpen(false);
 
+    persistSavedAccount({
+      email: targetEmail,
+      name: targetName,
+      photoURL: avatar
+    });
+
     try {
       localStorage.setItem(STORAGE_AUTH_KEY, JSON.stringify({
         user: creatorUser,
@@ -240,7 +309,7 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
         isDemoMode: false
       }));
     } catch (_e) {}
-  }, []);
+  }, [persistSavedAccount]);
 
   const connectDemoChannel = useCallback(() => {
     setError(null);
@@ -280,6 +349,14 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
       setIsDemoMode(false);
       setIsAuthModalOpen(false);
 
+      if (res.user.email) {
+        persistSavedAccount({
+          email: res.user.email,
+          name: res.user.displayName || res.user.email.split('@')[0],
+          photoURL: res.user.photoURL || undefined
+        });
+      }
+
       // Fetch initial videos
       if (res.accessToken && res.channel?.uploadsPlaylistId) {
         const vids = await fetchRecentYouTubeVideos(res.accessToken, res.channel.uploadsPlaylistId);
@@ -305,15 +382,27 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
 
       let message = 'ইউটিউব গুগল অ্যাকাউন্টে লগইন করা যায়নি।';
       if (err?.code === 'auth/popup-closed-by-user') {
-        message = 'লগইন উইন্ডোটি বন্ধ করা হয়েছে (Popup was closed). আপনি চাইলে নিচের "১-ক্লিকে সরাসরি ক্রিয়েটর লগইন" বোতামটি ব্যবহার করতে পারেন।';
+        message = 'লগইন উইন্ডোটি বন্ধ করা হয়েছে (Popup was closed). আপনি চাইলে নিচের "যেকোনো গুগল অ্যাকাউন্ট" ট্যাব ব্যবহার করতে পারেন।';
       } else if (isInvalidAction) {
-        message = 'ব্রাউজার বা আইফ্রেম সিকিউরিটি পলিসির কারণে গুগল পপআপ ব্লক হয়েছে। কোনো সমস্যা নেই—নিচের "১-ক্লিকে ক্রিয়েটর লগইন (sf0745026@gmail.com)" অপশন দিয়ে সাথে সাথে স্টুডিওতে যুক্ত হন।';
+        message = 'ব্রাউজার বা আইফ্রেম সিকিউরিটি পলিসির কারণে গুগল পপআপ ব্লক হয়েছে। কোনো সমস্যা নেই—নিচের "যেকোনো গুগল অ্যাকাউন্ট" অপশনে যেকোনো জিমেইল অ্যাড্রেস দিয়ে সাথে সাথে স্টুডিওতে যুক্ত হন।';
       } else if (rawMsg) {
         message = rawMsg;
       }
       setError(message);
       setIsAuthModalOpen(true);
     } finally {
+      setIsConnecting(false);
+    }
+  }, [persistSavedAccount]);
+
+  const signInRedirect = useCallback(async () => {
+    setError(null);
+    setIsConnecting(true);
+    try {
+      await signInWithYouTubeRedirect();
+    } catch (err: any) {
+      console.error('Redirect sign in error:', err);
+      setError(err?.message || 'গুগল রিডাইরেক্টে সমস্যা হয়েছে।');
       setIsConnecting(false);
     }
   }, []);
@@ -438,10 +527,13 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     isUploading,
     error,
     isAuthModalOpen,
+    savedAccounts,
     openAuthModal,
     closeAuthModal,
     signIn,
+    signInRedirect,
     loginAsCreator,
+    removeSavedAccount,
     connectDemoChannel,
     signOut,
     refreshChannel,
@@ -459,10 +551,13 @@ export const YouTubeAuthProvider: React.FC<{ children: ReactNode }> = ({ childre
     isUploading,
     error,
     isAuthModalOpen,
+    savedAccounts,
     openAuthModal,
     closeAuthModal,
     signIn,
+    signInRedirect,
     loginAsCreator,
+    removeSavedAccount,
     connectDemoChannel,
     signOut,
     refreshChannel,

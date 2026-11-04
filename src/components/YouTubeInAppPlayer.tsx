@@ -72,7 +72,9 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
     toggleWakeLock,
     openFullModal,
     sleepTimerMinutes,
-    setSleepTimer
+    setSleepTimer,
+    isAndroidNative,
+    isForegroundServiceActive
   } = useMusicPlayer();
 
   const [searchInput, setSearchInput] = useState<string>('Bangla romantic songs');
@@ -182,6 +184,10 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                   <Lock className="w-3 h-3" />
                   {isBn ? 'ডিসপ্লে বন্ধেও অবিরাম চলবে' : 'Screen-Off Audio Ready'}
+                </span>
+                <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 items-center gap-1">
+                  <Smartphone className="w-3 h-3 text-cyan-400" />
+                  {isBn ? 'অ্যান্ড্রয়েড ফোরগ্রাউন্ড সার্ভিস সাপোর্টেড' : 'Android Foreground Service Ready'}
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
@@ -325,17 +331,22 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
                   ))}
                 </div>
 
-                {/* Lock Screen Background Notification */}
+                {/* Lock Screen & Android Native Foreground Notification */}
                 <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-emerald-500/30 w-full max-w-md text-left flex items-start gap-3">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <div className="text-[11px] text-slate-300 space-y-0.5">
-                    <p className="font-bold text-emerald-300">
-                      {isBn ? 'ডিসপ্লে বন্ধেও গান অবিরাম চলবে' : 'Screen-Off Background Playback Enabled'}
+                    <p className="font-bold text-emerald-300 flex items-center gap-1.5">
+                      <span>{isBn ? 'ডিসপ্লে বন্ধেও গান অবিরাম চলবে' : 'Screen-Off Background Playback Enabled'}</span>
+                      {isAndroidNative && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-cyan-900/60 text-cyan-300 border border-cyan-700">
+                          Android Foreground
+                        </span>
+                      )}
                     </p>
                     <p className="text-slate-400 leading-relaxed">
                       {isBn
-                        ? 'আপনার মোবাইল বা পিসির স্ক্রিন লক অথবা বন্ধ করলেও গানটি ব্যাকগ্রাউন্ডে চলতে থাকবে। লক স্ক্রিন বা নোটিফিকেশন বার থেকে পজ ও নেক্সট গান কন্ট্রোল করতে পারবেন।'
-                        : 'Audio continues seamlessly when screen is turned off or locked. Control playback directly from the lock screen.'}
+                        ? 'ক্যাপাসিটর নেটিভ ফোরগ্রাউন্ড সার্ভিস ও মিডিয়াসেশন সক্রিয় থাকায় অ্যাপ মিনিমাইজ করলেও বা ফোন লক করলেও গান কোনো বিরতি ছাড়াই চলতে থাকবে। লক স্ক্রিন বা নোটিফিকেশন বার থেকে প্লে/পজ নিয়ন্ত্রণ করুন।'
+                        : 'Audio continues seamlessly when the app is minimized or phone screen is locked via Capacitor Native Foreground Service and MediaSession.'}
                     </p>
                   </div>
                 </div>

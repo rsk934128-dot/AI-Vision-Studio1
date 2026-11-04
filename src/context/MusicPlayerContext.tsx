@@ -1,8 +1,35 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { YouTubeTrack } from '../types';
 
 export type PlayMode = 'video' | 'audio';
 export type RepeatMode = 'none' | 'one' | 'all';
+
+export interface ForegroundAudioPlugin {
+  startForegroundService(options?: {
+    title?: string;
+    body?: string;
+  }): Promise<{ success: boolean; message?: string }>;
+  stopForegroundService(): Promise<{ success: boolean; message?: string }>;
+  updateNotification(options?: {
+    title?: string;
+    body?: string;
+  }): Promise<{ success: boolean }>;
+}
+
+export const NativeForegroundAudio = registerPlugin<ForegroundAudioPlugin>('ForegroundAudioService', {
+  web: {
+    async startForegroundService() {
+      return { success: true, message: 'Web environment' };
+    },
+    async stopForegroundService() {
+      return { success: true, message: 'Web environment' };
+    },
+    async updateNotification() {
+      return { success: true };
+    }
+  }
+});
 
 interface MusicPlayerContextType {
   currentTrack: YouTubeTrack | null;
@@ -12,6 +39,8 @@ interface MusicPlayerContextType {
   isWakeLockActive: boolean;
   isFullModalOpen: boolean;
   isMiniPlayerVisible: boolean;
+  isAndroidNative: boolean;
+  isForegroundServiceActive: boolean;
   queue: YouTubeTrack[];
   history: YouTubeTrack[];
   sleepTimerMinutes: number | null;
@@ -104,6 +133,9 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [volume, setVolumeState] = useState<number>(85);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('all');
+  const [isForegroundServiceActive, setIsForegroundServiceActive] = useState<boolean>(false);
+
+  const isAndroidNative = typeof window !== 'undefined' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
   const carrierAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -112,8 +144,110 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
   const wakeLockRef = useRef<any>(null);
   const timerIntervalRef = useRef<any>(null);
 
-  // Initialize Web Audio and carrier element for OS audio session retention
+  // Start native Android foreground service via Capacitor bridge
+  const startNativeForeground = useCallback(async (track?: YouTubeTrack | null) => {
+    const activeTrack = track || currentTrack;
+    const title = activeTrack?.title || 'AI Video Studio • Audio Playing';
+    const body = activeTrack?.channel || 'Background media playback active';
+
+    try {
+      await NativeForegroundAudio.startForegroundService({ title, body });
+      setIsForegroundServiceActive(true);
+    } catch (err) {
+      console.debug('Capacitor startForegroundService notice:', err);
+    }
+
+    // Direct fallback through Capacitor window bridge if available
+    try {
+      const cap = (window as any).Capacitor;
+      if (cap?.Plugins?.ForegroundAudioService?.startForegroundService) {
+        await cap.Plugins.ForegroundAudioService.startForegroundService({ title, body });
+        setIsForegroundServiceActive(true);
+      } else if (cap?.toNative) {
+        cap.toNative('ForegroundAudioService', 'startForegroundService', { title, body });
+        setIsForegroundServiceActive(true);
+      }
+    } catch (_e) {}
+  }, [currentTrack]);
+
+  // Stop native Android foreground service via Capacitor bridge
+  const stopNativeForeground = useCallback(async () => {
+    try {
+      await NativeForegroundAudio.stopForegroundService();
+      setIsForegroundServiceActive(false);
+    } catch (err) {
+      console.debug('Capacitor stopForegroundService notice:', err);
+    }
+
+    try {
+      const cap = (window as any).Capacitor;
+      if (cap?.Plugins?.ForegroundAudioService?.stopForegroundService) {
+        await cap.Plugins.ForegroundAudioService.stopForegroundService();
+        setIsForegroundServiceActive(false);
+      } else if (cap?.toNative) {
+        cap.toNative('ForegroundAudioService', 'stopForegroundService', {});
+        setIsForegroundServiceActive(false);
+      }
+    } catch (_e) {}
+  }, []);
+
+  // Update notification content on Android notification bar
+  const updateNativeNotification = useCallback(async (track?: YouTubeTrack | null) => {
+    const activeTrack = track || currentTrack;
+    if (!activeTrack) return;
+    const title = activeTrack.title;
+    const body = activeTrack.channel;
+
+    try {
+      await NativeForegroundAudio.updateNotification({ title, body });
+    } catch (_e) {}
+
+    try {
+      const cap = (window as any).Capacitor;
+      if (cap?.Plugins?.ForegroundAudioService?.updateNotification) {
+        await cap.Plugins.ForegroundAudioService.updateNotification({ title, body });
+      }
+    } catch (_e) {}
+  }, [currentTrack]);
+
+  // Keep native Android notification updated with current song info
+  useEffect(() => {
+    if (isPlaying && currentTrack) {
+      updateNativeNotification(currentTrack);
+    }
+  }, [currentTrack, isPlaying, updateNativeNotification]);
+
+  // Native Cordova / Capacitor background event handlers
+  useEffect(() => {
+    const handleNativePause = () => {
+      // Fired when Android user presses home button, locks screen, or switches to another app
+      if (isPlaying) {
+        startNativeForeground(currentTrack);
+        ensureBackgroundAudioActive();
+      }
+    };
+
+    const handleNativeResume = () => {
+      // Fired when Android app comes back to the foreground
+      if (isPlaying) {
+        ensureBackgroundAudioActive();
+      }
+    };
+
+    document.addEventListener('pause', handleNativePause);
+    document.addEventListener('resume', handleNativeResume);
+
+    return () => {
+      document.removeEventListener('pause', handleNativePause);
+      document.removeEventListener('resume', handleNativeResume);
+    };
+  }, [isPlaying, currentTrack, startNativeForeground]);
+
+  // Initialize Web Audio, carrier element, and Android Foreground Service for OS audio session retention
   const ensureBackgroundAudioActive = useCallback(() => {
+    // 1. Engage native Android foreground service via Capacitor bridge
+    startNativeForeground(currentTrack);
+
     try {
       if (!carrierAudioRef.current) {
         carrierAudioRef.current = createContinuousAudioCarrier();
@@ -145,16 +279,19 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     } catch (err) {
       console.warn('Background audio session initialization notice:', err);
     }
-  }, []);
+  }, [currentTrack, startNativeForeground]);
 
   const pauseBackgroundAudio = useCallback(() => {
+    // Stop native Android foreground service via Capacitor bridge
+    stopNativeForeground();
+
     try {
       carrierAudioRef.current?.pause();
       if (audioContextRef.current && audioContextRef.current.state === 'running') {
         audioContextRef.current.suspend().catch(() => {});
       }
     } catch (_e) {}
-  }, []);
+  }, [stopNativeForeground]);
 
   // Update MediaSession API for Android/iOS Lock Screen Controls and notification shade
   useEffect(() => {
@@ -382,6 +519,8 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         isWakeLockActive,
         isFullModalOpen,
         isMiniPlayerVisible,
+        isAndroidNative,
+        isForegroundServiceActive,
         queue,
         history,
         sleepTimerMinutes,

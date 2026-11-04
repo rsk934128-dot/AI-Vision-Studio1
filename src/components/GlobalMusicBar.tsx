@@ -47,6 +47,8 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
     isWakeLockActive,
     isFullModalOpen,
     isMiniPlayerVisible,
+    isAndroidNative,
+    isForegroundServiceActive,
     queue,
     sleepTimerMinutes,
     sleepTimerRemaining,
@@ -209,14 +211,24 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
                 <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate group-hover:text-cyan-300 transition">
                   {currentTrack.title}
                 </h4>
-                {/* Screen-Off Background Badge */}
-                <span 
-                  className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 whitespace-nowrap"
-                  title={isBn ? 'ডিসপ্লে বন্ধ করলেও ব্যাকগ্রাউন্ডে চলবে' : 'Keeps playing with screen locked/off'}
-                >
-                  <Lock className="w-2.5 h-2.5" />
-                  <span>{isBn ? 'স্ক্রিন-অফ অডিও চালু' : 'Screen-Off Mode'}</span>
-                </span>
+                {/* Android Native Foreground Service or Screen-Off Background Badge */}
+                {isAndroidNative || isForegroundServiceActive ? (
+                  <span 
+                    className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 whitespace-nowrap"
+                    title={isBn ? 'ক্যাপাসিটর নেটিভ ফোরগ্রাউন্ড সার্ভিস সচল (অ্যাপ মিনিমাইজ করলেও গান চলবে)' : 'Capacitor Native Foreground Service Active (Continues playing when minimized)'}
+                  >
+                    <Smartphone className="w-2.5 h-2.5 text-cyan-400" />
+                    <span>{isBn ? 'নেটিভ ফোরগ্রাউন্ড সার্ভিস' : 'Native Foreground'}</span>
+                  </span>
+                ) : (
+                  <span 
+                    className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 whitespace-nowrap"
+                    title={isBn ? 'ডিসপ্লে বন্ধ করলেও ব্যাকগ্রাউন্ডে চলবে' : 'Keeps playing with screen locked/off'}
+                  >
+                    <Lock className="w-2.5 h-2.5" />
+                    <span>{isBn ? 'স্ক্রিন-অফ অডিও চালু' : 'Screen-Off Mode'}</span>
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 text-[11px] text-slate-400 truncate">
                 <span className="truncate">{currentTrack.channel}</span>

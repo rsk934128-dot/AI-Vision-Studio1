@@ -23,7 +23,8 @@ import {
   Share2,
   RefreshCw,
   Sliders,
-  HelpCircle
+  HelpCircle,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Language } from '../types';
 
@@ -34,7 +35,7 @@ interface AndroidGitHubBuilderProps {
 export const AndroidGitHubBuilder: React.FC<AndroidGitHubBuilderProps> = ({ lang }) => {
   const isBn = lang === 'bn';
 
-  const [activeMethod, setActiveMethod] = useState<'github-actions' | 'capacitor' | 'pwa-twa' | 'config-generator'>('github-actions');
+  const [activeMethod, setActiveMethod] = useState<'github-actions' | 'capacitor' | 'pwa-twa' | 'config-generator' | 'app-logo'>('github-actions');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Config Generator State
@@ -280,6 +281,21 @@ jobs:
         >
           <Sliders className="w-4 h-4" />
           <span>{isBn ? 'কনফিগ জেনারেটর ও কি-স্টোর' : 'App Config & Keystore'}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveMethod('app-logo')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+            activeMethod === 'app-logo'
+              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400/50'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800'
+          }`}
+        >
+          <ImageIcon className="w-4 h-4 text-emerald-400" />
+          <span>{isBn ? 'APK অ্যাপ লোগো ও আইকন প্যাকেজ' : 'APK App Logo & Icon Suite'}</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
+            HD
+          </span>
         </button>
       </div>
 
@@ -795,6 +811,299 @@ jobs:
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-56">
                 <pre>{generatedManifestXml}</pre>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* METHOD 5: APK APP LOGO & LAUNCHER ICON SUITE */}
+      {activeMethod === 'app-logo' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-8">
+            {/* Header Banner */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+                    {isBn ? 'অ্যান্ড্রয়েড লঞ্চার আইকন সেন্টার' : 'Android Launcher Icon Hub'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-cyan-400" />
+                    {isBn ? 'Android 14+ Adaptive Icons Ready' : 'Adaptive Icons Pre-compiled'}
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                  {isBn ? 'APK অ্যাপ লোগো, প্লে-স্টোর আইকন ও লঞ্চার রিসোর্স' : 'APK App Logo, Play Store Icon & Launcher Assets'}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                  {isBn
+                    ? 'আপনার তৈরি করা APK অ্যাপের জন্য প্রতিটি মোবাইল রেজোলিউশনের (mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi) লঞ্চার আইকন এবং Google Play Store 512x512 আইকন স্বয়ংক্রিয়ভাবে তৈরি ও লিঙ্ক করা রয়েছে।'
+                    : 'High-definition 1024x1024 master logo, Google Play Store 512x512 icon, and all Android mipmap densities pre-compiled for GitHub Actions and Android Studio builds.'}
+                </p>
+              </div>
+
+              {/* Direct ZIP Download */}
+              <a
+                href="/android-apk-icons.zip"
+                download="ai-video-studio-android-icons.zip"
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-emerald-600/30 transition transform active:scale-95 shrink-0 cursor-pointer text-center justify-center"
+              >
+                <Download className="w-4 h-4" />
+                <span>{isBn ? 'সকল আইকন ZIP ডাউনলোড' : 'Download All Icons (ZIP)'}</span>
+              </a>
+            </div>
+
+            {/* Visual Icon Previews Grid */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span>{isBn ? 'লাইভ ডিভাইস প্রিভিউ (মোবাইল স্ক্রিনে যেভাবে দেখাবে)' : 'Live Android Device Previews'}</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Android Adaptive Squircle Icon */}
+                <div className="rounded-2xl bg-slate-950/80 border border-slate-800 p-5 flex flex-col items-center text-center space-y-4 relative group hover:border-emerald-500/50 transition">
+                  <div className="relative w-28 h-28 rounded-[24px] overflow-hidden shadow-2xl ring-2 ring-emerald-500/40 group-hover:scale-105 transition duration-300 bg-slate-900 flex items-center justify-center">
+                    <img src="/logo.jpg" alt="Android Squircle Icon" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/10 pointer-events-none" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-white">
+                      {isBn ? 'স্ট্যান্ডার্ড স্কোয়ারকেল আইকন' : 'Adaptive Squircle Icon'}
+                    </h5>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {isBn ? 'Samsung OneUI, Xiaomi MIUI, Oppo ও Vivo' : 'Samsung, Xiaomi, Oppo & Vivo launchers'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                    ic_launcher.png (192x192)
+                  </span>
+                </div>
+
+                {/* 2. Google Pixel Round Icon */}
+                <div className="rounded-2xl bg-slate-950/80 border border-slate-800 p-5 flex flex-col items-center text-center space-y-4 relative group hover:border-emerald-500/50 transition">
+                  <div className="relative w-28 h-28 rounded-full overflow-hidden shadow-2xl ring-4 ring-emerald-500/30 group-hover:scale-105 transition duration-300 bg-slate-900 flex items-center justify-center">
+                    <img src="/logo.jpg" alt="Android Circular Icon" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/15 pointer-events-none" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-white">
+                      {isBn ? 'সার্কুলার রাউন্ড আইকন' : 'Circular Round Icon'}
+                    </h5>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {isBn ? 'Google Pixel, Motorola, Nothing ও AOSP' : 'Google Pixel, Motorola & Stock Android'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                    ic_launcher_round.png
+                  </span>
+                </div>
+
+                {/* 3. Android Notification & Foreground Media Icon */}
+                <div className="rounded-2xl bg-slate-950/80 border border-slate-800 p-5 flex flex-col items-center text-center space-y-4 relative group hover:border-cyan-500/50 transition">
+                  <div className="w-28 h-28 rounded-2xl bg-slate-900 border border-slate-800 p-3 flex flex-col items-center justify-center space-y-2 group-hover:scale-105 transition duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 p-0.5 shadow-lg">
+                      <img src="/logo.jpg" alt="Notification Icon" className="w-full h-full rounded-[10px] object-cover" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-[9px] font-bold text-cyan-300 uppercase">Foreground Service</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-white">
+                      {isBn ? 'নোটিফিকেশন বার ও ব্যাকগ্রাউন্ড' : 'Notification Bar & Service'}
+                    </h5>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {isBn ? 'গান চলার সময় ফোনের লক স্ক্রিনে দেখাবে' : 'Displayed during background media playback'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-cyan-400 border border-slate-800">
+                    ForegroundAudioService
+                  </span>
+                </div>
+
+                {/* 4. Google Play Store Master 512x512 */}
+                <div className="rounded-2xl bg-slate-950/80 border border-slate-800 p-5 flex flex-col items-center text-center space-y-4 relative group hover:border-amber-500/50 transition">
+                  <div className="relative w-28 h-28 rounded-2xl overflow-hidden shadow-2xl ring-2 ring-amber-500/40 group-hover:scale-105 transition duration-300 bg-slate-900 flex items-center justify-center">
+                    <img src="/playstore-icon.png" alt="Google Play Store Icon" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-white">
+                      {isBn ? 'গুগল প্লে-স্টোর মাস্টার আইকন' : 'Google Play Store 512x512'}
+                    </h5>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {isBn ? 'Google Play Console সাবমিশনের জন্য প্রস্তুত' : 'Required for Google Play Store Listing'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-amber-400 border border-slate-800">
+                    playstore-icon.png (512x512)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Download Buttons Grid */}
+            <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4">
+              <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <Download className="w-4 h-4 text-emerald-400" />
+                <span>{isBn ? 'সরাসরি ফাইল ডাউনলোড করুন' : 'Direct Asset Downloads'}</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <a
+                  href="/logo.jpg"
+                  download="ai-video-studio-master-logo-1024.jpg"
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700/80 text-xs font-bold text-white transition cursor-pointer hover:border-emerald-500"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img src="/logo.jpg" alt="Icon" className="w-7 h-7 rounded-lg object-cover" />
+                    <div className="truncate">
+                      <p className="truncate">Master Logo (1024px)</p>
+                      <p className="text-[10px] text-slate-400 font-normal">High-Res JPG</p>
+                    </div>
+                  </div>
+                  <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+
+                <a
+                  href="/playstore-icon.png"
+                  download="playstore-icon-512x512.png"
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700/80 text-xs font-bold text-white transition cursor-pointer hover:border-amber-500"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img src="/playstore-icon.png" alt="Icon" className="w-7 h-7 rounded-lg object-cover" />
+                    <div className="truncate">
+                      <p className="truncate">Play Store (512px)</p>
+                      <p className="text-[10px] text-amber-400 font-normal">PNG Alpha</p>
+                    </div>
+                  </div>
+                  <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+
+                <a
+                  href="/pwa-192x192.png"
+                  download="pwa-icon-192.png"
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700/80 text-xs font-bold text-white transition cursor-pointer hover:border-cyan-500"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img src="/pwa-192x192.png" alt="Icon" className="w-7 h-7 rounded-lg object-cover" />
+                    <div className="truncate">
+                      <p className="truncate">Launcher (192px)</p>
+                      <p className="text-[10px] text-cyan-400 font-normal">PWA & APK</p>
+                    </div>
+                  </div>
+                  <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+
+                <a
+                  href="/android-apk-icons.zip"
+                  download="android-apk-icons.zip"
+                  className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-600/60 text-xs font-bold text-emerald-300 transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <PackageCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+                    <div className="truncate">
+                      <p className="truncate">All Mipmap Densities</p>
+                      <p className="text-[10px] text-emerald-400 font-normal">ZIP Package (815 KB)</p>
+                    </div>
+                  </div>
+                  <Download className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                </a>
+              </div>
+            </div>
+
+            {/* Android Mipmap Densities Specification Table */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <FileCode className="w-4 h-4 text-emerald-400" />
+                <span>{isBn ? 'অ্যান্ড্রয়েড প্রজেক্ট ফাইল স্ট্রাকচার ও সাইজ বিবরণ' : 'Android Resource Mipmap Specifications'}</span>
+              </h4>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900/80 text-[11px] font-bold text-slate-400 uppercase border-b border-slate-800">
+                    <tr>
+                      <th className="p-3">Density Folder</th>
+                      <th className="p-3">Launcher Size</th>
+                      <th className="p-3">Foreground Size</th>
+                      <th className="p-3">Target Screens</th>
+                      <th className="p-3 text-right">Project Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    <tr>
+                      <td className="p-3 font-mono text-emerald-400">android/.../res/mipmap-mdpi/</td>
+                      <td className="p-3 font-mono">48 x 48 px</td>
+                      <td className="p-3 font-mono">108 x 108 px</td>
+                      <td className="p-3 text-slate-400">Baseline ~160 dpi</td>
+                      <td className="p-3 text-right">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          <Check className="w-3 h-3" /> Synced
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-mono text-emerald-400">android/.../res/mipmap-hdpi/</td>
+                      <td className="p-3 font-mono">72 x 72 px</td>
+                      <td className="p-3 font-mono">162 x 162 px</td>
+                      <td className="p-3 text-slate-400">High density ~240 dpi</td>
+                      <td className="p-3 text-right">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          <Check className="w-3 h-3" /> Synced
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-mono text-emerald-400">android/.../res/mipmap-xhdpi/</td>
+                      <td className="p-3 font-mono">96 x 96 px</td>
+                      <td className="p-3 font-mono">216 x 216 px</td>
+                      <td className="p-3 text-slate-400">Extra High ~320 dpi (720p)</td>
+                      <td className="p-3 text-right">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          <Check className="w-3 h-3" /> Synced
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-mono text-emerald-400">android/.../res/mipmap-xxhdpi/</td>
+                      <td className="p-3 font-mono">144 x 144 px</td>
+                      <td className="p-3 font-mono">324 x 324 px</td>
+                      <td className="p-3 text-slate-400">Extra Extra High ~480 dpi (1080p FHD)</td>
+                      <td className="p-3 text-right">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          <Check className="w-3 h-3" /> Synced
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-mono text-emerald-400">android/.../res/mipmap-xxxhdpi/</td>
+                      <td className="p-3 font-mono">192 x 192 px</td>
+                      <td className="p-3 font-mono">432 x 432 px</td>
+                      <td className="p-3 text-slate-400">Ultra High ~640 dpi (1440p QHD / 4K)</td>
+                      <td className="p-3 text-right">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          <Check className="w-3 h-3" /> Synced
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* How Android Uses It Guide */}
+            <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-600/40 text-xs text-slate-300 space-y-2">
+              <h5 className="font-bold text-emerald-300 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                {isBn ? 'স্বয়ংক্রিয় ইন্টিগ্রেশন ও বিল্ড সুবিধা:' : 'Automatic Build & Playback Integration:'}
+              </h5>
+              <p className="text-[11px] leading-relaxed text-slate-300">
+                {isBn
+                  ? 'আপনার AndroidManifest.xml ফাইলে android:icon="@mipmap/ic_launcher" এবং android:roundIcon="@mipmap/ic_launcher_round" কনফিগার করা রয়েছে। এছাড়াও আমাদের ForegroundAudioService এই একই আইকন ব্যবহার করে যাতে অ্যাপ মিনিমাইজ করে ব্যাকগ্রাউন্ডে গান শুনলেও নোটিফিকেশন বারে সুন্দর ব্র্যান্ডিং আইকন প্রদর্শিত হয়।'
+                  : 'Configured in AndroidManifest.xml via android:icon="@mipmap/ic_launcher" and used by ForegroundAudioService so lock screen and notification media sessions display this exact icon.'}
+              </p>
             </div>
           </div>
         </div>

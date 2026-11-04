@@ -1,5 +1,7 @@
 import { 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
@@ -15,9 +17,11 @@ export const YOUTUBE_SCOPES = [
   'https://www.googleapis.com/auth/youtube.upload'
 ];
 
-const provider = new GoogleAuthProvider();
-YOUTUBE_SCOPES.forEach((scope) => provider.addScope(scope));
-provider.setCustomParameters({
+export const googleProvider = new GoogleAuthProvider();
+YOUTUBE_SCOPES.forEach((scope) => googleProvider.addScope(scope));
+
+// Enable prompt: 'select_account' so Android mobile and desktop users can choose ANY Google account
+googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
@@ -29,18 +33,37 @@ let isSigningIn = false;
 export const getCachedAccessToken = (): string | null => cachedAccessToken;
 
 /**
- * Initialize Firebase Auth listener. Clears memory token on logout.
+ * Initialize Firebase Auth listener. Also checks redirect results for Android mobile devices.
  */
 export const initYouTubeAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  // Check redirect result for mobile Android users returning from Google account chooser
+  if (typeof window !== 'undefined') {
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result && result.user) {
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          if (credential?.accessToken) {
+            cachedAccessToken = credential.accessToken;
+            if (onAuthSuccess) {
+              onAuthSuccess(result.user, cachedAccessToken);
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        console.debug('Google redirect result notice:', err);
+      });
+  }
+
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
-        // Token not in memory (page reload), user needs to trigger fresh sign-in popup to renew access token
+        // Token not in memory (page reload), user needs to trigger fresh sign-in to renew access token
         if (onAuthFailure) onAuthFailure();
       }
     } else {
@@ -51,7 +74,7 @@ export const initYouTubeAuth = (
 };
 
 /**
- * Sign in with Google to get YouTube OAuth Access Token
+ * Sign in with Google to get YouTube OAuth Access Token (with Android popup/redirect support)
  */
 export const signInWithYouTube = async (): Promise<{
   user: User;
@@ -60,7 +83,10 @@ export const signInWithYouTube = async (): Promise<{
 }> => {
   try {
     isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     
     if (!credential?.accessToken) {
@@ -84,6 +110,17 @@ export const signInWithYouTube = async (): Promise<{
     console.error('YouTube Sign-in error:', error);
     throw error;
   }
+};
+
+/**
+ * Sign in with Google using full-page redirect (specifically optimized for Android Chrome and mobile browsers)
+ */
+export const signInWithYouTubeRedirect = async (): Promise<void> => {
+  isSigningIn = true;
+  googleProvider.setCustomParameters({
+    prompt: 'select_account'
+  });
+  await signInWithRedirect(auth, googleProvider);
 };
 
 /**

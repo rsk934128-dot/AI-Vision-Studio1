@@ -1,18 +1,39 @@
 {
-  "short_name": "AI Video Studio",
+  "id": "/",
+  "short_name": "AI Video",
   "name": "AI Video Studio - Photo Music Video & YouTube Production",
+  "description": "Comprehensive AI Video Platform featuring text-to-video generation, video understanding with Gemini, and background audio streaming.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "orientation": "portrait-primary",
+  "categories": ["multimedia", "productivity", "video"],
   "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    },
     {
       "src": "/logo.jpg",
       "type": "image/jpeg",
-      "sizes": "192x192 512x512",
-      "purpose": "any maskable"
+      "sizes": "1024x1024",
+      "purpose": "any"
     }
-  ],
-  "start_url": "/",
-  "background_color": "#090d16",
-  "theme_color": "#090d16",
-  "display": "standalone",
-  "orientation": "portrait-primary",
-  "categories": ["multimedia", "productivity", "video"]
+  ]
 }
