@@ -146,10 +146,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('audio-presentation')}>
             <div className="relative w-10 h-10 rounded-xl overflow-hidden ring-1 ring-cyan-500/40 shadow-lg shadow-cyan-500/25 group-hover:ring-cyan-400 group-hover:shadow-cyan-400/40 transition-all duration-300 bg-slate-900">
               <img
-                src="/src/assets/images/ai_video_logo_1793109699890.jpg"
+                src="/logo.jpg"
                 alt="AI Video Studio Logo"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/logo.jpg';
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/10 pointer-events-none" />
             </div>

@@ -866,10 +866,13 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl overflow-hidden ring-1 ring-purple-500/40 shadow-xl shadow-purple-500/20 bg-slate-900 flex-shrink-0">
                 <img
-                  src="/src/assets/images/ai_video_logo_1793109699890.jpg"
+                  src="/logo.jpg"
                   alt="AI Video Studio Logo"
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/logo.jpg';
+                  }}
                 />
               </div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-semibold tracking-wide uppercase">
@@ -1585,6 +1588,10 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
                           src={scene.imageUrl}
                           alt={scene.sceneTitle}
                           className="w-full h-full object-cover group-hover:scale-105 transition"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80';
+                          }}
                         />
                         <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] font-mono text-white">
                           {scene.timestampLabel}

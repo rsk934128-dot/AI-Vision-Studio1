@@ -33,6 +33,11 @@ import {
 import { Language, YouTubeUploadedVideo, YouTubeTrack } from '../types';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { useToast } from '../context/ToastContext';
+import { 
+  searchYouTubeMusic, 
+  getSafeYouTubeEmbedUrl, 
+  DEFAULT_FALLBACK_THUMBNAIL 
+} from '../services/youtubeMusicCatalog';
 
 interface YouTubeInAppPlayerProps {
   lang: Language;
@@ -85,7 +90,7 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
   const [activeVideoId, setActiveVideoId] = useState<string>(initialVideoId);
   const [showSleepMenu, setShowSleepMenu] = useState<boolean>(false);
 
-  // Search YouTube API function
+  // Search YouTube API function with automatic APK, online & offline fallback
   const executeSearch = async (queryToSearch: string) => {
     const q = queryToSearch.trim();
     if (!q) return;
@@ -93,28 +98,10 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
     setIsSearching(true);
     setActiveQuery(q);
 
-    // Direct YouTube URL or 11-char ID check
-    const ytIdMatch = q.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([\w-]{11})/) || (q.length === 11 && !q.includes(' ') ? [null, q] : null);
-    if (ytIdMatch && ytIdMatch[1]) {
-      const directId = ytIdMatch[1];
-      const directTrack: YouTubeTrack = {
-        id: directId,
-        title: `YouTube Video (${directId})`,
-        channel: 'YouTube Video',
-        duration: 'Playing',
-        thumbnail: `https://i.ytimg.com/vi/${directId}/hqdefault.jpg`
-      };
-      playTrack(directTrack, playMode);
-      setActiveVideoId(directId);
-      setIsSearching(false);
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-        setSearchResults(data.results);
+      const results = await searchYouTubeMusic(q);
+      if (Array.isArray(results) && results.length > 0) {
+        setSearchResults(results);
       }
     } catch (err) {
       console.warn('YouTube search client notice:', err);
@@ -158,13 +145,13 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
 
   const activeTrackObj = currentTrack || {
     id: activeVideoId,
-    title: 'Lofi Girl – Synthwave Chill Radio & Beats to Relax',
-    channel: 'Lofi Girl',
-    duration: 'LIVE',
+    title: 'Arijit Singh Special – Best Romantic Bangla Songs',
+    channel: 'SVF Music',
+    duration: '29:27',
     thumbnail: `https://i.ytimg.com/vi/${activeVideoId}/hqdefault.jpg`
   };
 
-  const embedUrl = `https://www.youtube.com/embed/${activeTrackObj.id}?autoplay=1&playsinline=1&controls=1&rel=0`;
+  const embedUrl = getSafeYouTubeEmbedUrl(activeTrackObj.id, true);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -295,6 +282,10 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
                         alt={activeTrackObj.title}
                         className={`w-full h-full object-cover ${isPlaying ? 'animate-spin-slow' : 'grayscale'}`}
                         style={{ animationDuration: '16s' }}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_THUMBNAIL;
+                        }}
                       />
                       <div className="absolute inset-0 m-auto w-8 h-8 rounded-full bg-slate-900 border-2 border-slate-700 flex items-center justify-center">
                         <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
@@ -458,7 +449,15 @@ export const YouTubeInAppPlayer: React.FC<YouTubeInAppPlayerProps> = ({
                     {/* Thumbnail & Meta */}
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="relative w-16 h-12 rounded-xl overflow-hidden bg-slate-950 flex-shrink-0 shadow-md">
-                        <img src={song.thumbnail} alt={song.title} className="w-full h-full object-cover" />
+                        <img 
+                          src={song.thumbnail} 
+                          alt={song.title} 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_THUMBNAIL;
+                          }}
+                        />
                         <span className="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/80 font-mono text-[9px] text-white">
                           {song.duration}
                         </span>

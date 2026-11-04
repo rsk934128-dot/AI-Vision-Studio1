@@ -32,6 +32,10 @@ import {
 } from 'lucide-react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { Language } from '../types';
+import { 
+  getSafeYouTubeEmbedUrl, 
+  DEFAULT_FALLBACK_THUMBNAIL 
+} from '../services/youtubeMusicCatalog';
 
 interface GlobalMusicBarProps {
   lang: Language;
@@ -130,8 +134,8 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
     return null;
   }
 
-  // YouTube embed URL with API enabled
-  const embedUrl = `https://www.youtube.com/embed/${currentTrack.id}?enablejsapi=1&autoplay=1&playsinline=1&controls=1&rel=0&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`;
+  // YouTube safe embed URL (avoids Error 150 on Android APK/Capacitor)
+  const embedUrl = getSafeYouTubeEmbedUrl(currentTrack.id, true);
 
   return (
     <>
@@ -194,6 +198,10 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
                 src={currentTrack.thumbnail} 
                 alt={currentTrack.title}
                 className={`w-full h-full object-cover transition duration-500 ${isPlaying ? 'scale-105' : 'grayscale'}`}
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_THUMBNAIL;
+                }}
               />
               {isPlaying && (
                 <div className="absolute inset-0 bg-cyan-950/30 flex items-center justify-center">
@@ -423,7 +431,15 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             <span className="text-xs font-mono text-slate-500 w-5 text-right">{idx + 1}</span>
-                            <img src={t.thumbnail} alt={t.title} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                            <img 
+                              src={t.thumbnail} 
+                              alt={t.title} 
+                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0" 
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_THUMBNAIL;
+                              }}
+                            />
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-semibold text-white truncate">{t.title}</p>
                               <p className="text-[10px] text-slate-400 truncate">{t.channel}</p>
@@ -462,6 +478,10 @@ export const GlobalMusicBar: React.FC<GlobalMusicBarProps> = ({ lang }) => {
                           alt={currentTrack.title} 
                           className={`w-full h-full object-cover ${isPlaying ? 'animate-spin-slow' : 'grayscale'}`}
                           style={{ animationDuration: '18s' }}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_THUMBNAIL;
+                          }}
                         />
                         {/* Center Vinyl Spindle Hole */}
                         <div className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-slate-900 border-2 border-slate-700 flex items-center justify-center">

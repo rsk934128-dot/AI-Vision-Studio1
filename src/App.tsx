@@ -140,10 +140,13 @@ export default function App() {
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg overflow-hidden ring-1 ring-cyan-500/40 shadow-sm shadow-cyan-500/20 bg-slate-900 flex-shrink-0">
                 <img
-                  src="/src/assets/images/ai_video_logo_1793109699890.jpg"
+                  src="/logo.jpg"
                   alt="AI Video Studio Logo"
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/logo.jpg';
+                  }}
                 />
               </div>
               <span className="font-bold text-white">AI Video Studio</span>
