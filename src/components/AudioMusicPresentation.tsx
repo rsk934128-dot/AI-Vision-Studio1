@@ -45,8 +45,12 @@ import {
   drawPerformerChoreography, 
   PERFORMANCE_STYLES, 
   PerformanceStyle, 
-  detectPerformanceStyle 
+  PerformerGender,
+  PerformerVisualType,
+  detectPerformanceStyle,
+  detectSingerGender
 } from '../services/performerChoreography';
+import { requestAudioPresentationPlan } from '../services/presentationService';
 
 interface AudioMusicPresentationProps {
   lang: Language;
@@ -67,6 +71,18 @@ interface AudioPreset {
 }
 
 const PRESET_TRACKS: AudioPreset[] = [
+  {
+    id: 'preset-rubel-bank-fintech',
+    title: 'রুবেল ব্যাংক ও ডিজিটাল ব্যাংকিং (মহিলা কণ্ঠ - সাইবার সুর)',
+    artist: 'নারী কণ্ঠশিল্পী ও রুবেল ব্যাংক',
+    genre: 'Cyber Fintech & Digital Banking',
+    duration: 42,
+    audioUrl: '/assets/aistudio/gemini_music__1__Presentation__1__b2a20967.webm',
+    lyrics: 'ডিজিটাল স্রোতে স্বপ্ন বোনা, জিরো নলেজ প্রুফের মায়াজাল...\n৬৪ জেলায় গড়ে তোলা অনন্য সেতুবন্ধ,\nবায়োমেট্রিক সুরক্ষায় সুরক্ষিত প্রতিটি লেনদেন,\nরুবেল ব্যাংকের আধুনিকতায় আস্থা অবিচল সবার মনে!',
+    defaultEmotion: 'আধুনিক সাইবার প্রযুক্তি ও ডিজিটাল ব্যাংকিং আস্থা',
+    defaultStyle: 'pop_dj_stage',
+    descriptionBn: 'নারী কণ্ঠের সাইবার ও ডিজিটাল ব্যাংকিং গান, ৬৪ জেলার সংযোগ, বায়োমেট্রিক নিরাপত্তা ও বাস্তব অভিনেত্রী।'
+  },
   {
     id: 'preset-hotel-farid-jingle',
     title: 'হোটেল আল শেখ ফরিদ (জিঙ্গেল ও ধামাকা ডিজে গান)',
@@ -171,8 +187,10 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
   const [exportProgress, setExportProgress] = useState<number>(0);
 
   // Performer & Acting System states
-  const [performanceStyle, setPerformanceStyle] = useState<PerformanceStyle>('jingle_presenter');
+  const [performanceStyle, setPerformanceStyle] = useState<PerformanceStyle>('pop_dj_stage');
   const [showPerformer, setShowPerformer] = useState<boolean>(true);
+  const [performerGender, setPerformerGender] = useState<'female' | 'male' | 'duet' | 'auto'>('auto');
+  const [performerVisualType, setPerformerVisualType] = useState<PerformerVisualType>('realistic_human');
   const [autoDetectStyle, setAutoDetectStyle] = useState<boolean>(true);
 
   // Refs
@@ -514,7 +532,10 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
           songTitle: project?.title || songTitle,
           artistName: project?.artist || artistName,
           aspectRatio,
-          primaryEmotion: project?.primaryEmotion
+          primaryEmotion: project?.primaryEmotion,
+          performerGender: performerGender === 'auto' ? undefined : performerGender,
+          performerVisualType: showPerformer ? performerVisualType : 'cinematic_story',
+          sceneIndex: activeSceneIndex
         });
       }
 
@@ -543,7 +564,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [project, activeSceneIndex, currentTime, isPlaying, drawWatermarkOnCanvas, showPerformer, performanceStyle, aspectRatio, songTitle, artistName]);
+  }, [project, activeSceneIndex, currentTime, isPlaying, drawWatermarkOnCanvas, showPerformer, performanceStyle, performerGender, performerVisualType, aspectRatio, songTitle, artistName]);
 
   // Generous AI Generation Handler
   const handleGeneratePresentation = async () => {
@@ -576,25 +597,28 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         `[Lyrics Engine] শব্দাবলী ক্যাপচার সম্পন্ন: ছন্দ ও তাল বিশ্লেষণ চলছে...`
       ]);
 
-      // Prepare Audio Data if custom file
+      // Prepare Audio Data snippet if custom file (sampled slice under 512KB for lightning-fast payload)
       let audioBase64: string | undefined = undefined;
       if (customAudioFile) {
         try {
-          const buffer = await customAudioFile.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          let binary = '';
-          const len = Math.min(bytes.byteLength, 15 * 1024 * 1024); // max 15MB for fast JSON
-          for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          audioBase64 = btoa(binary);
+          const slice = customAudioFile.slice(0, 512 * 1024);
+          audioBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const res = (reader.result as string) || '';
+              const base64 = res.split(',')[1] || '';
+              resolve(base64);
+            };
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(slice);
+          });
         } catch (e) {
-          console.warn('Could not base64 encode file:', e);
+          console.warn('Could not encode audio slice:', e);
         }
       }
 
       // Stage 2: Gemini Analysis Call
-      await new Promise(r => setTimeout(r, deepThinkingMode ? 6000 : 2500));
+      await new Promise(r => setTimeout(r, deepThinkingMode ? 4000 : 1500));
       setCurrentStageIndex(2);
       setGenerationProgress(50);
       setReasoningLogs(prev => [
@@ -603,27 +627,23 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         `[Sentiment Core] মন ছোঁয়া রোমান্টিক বিষাদ ও নস্টালজিয়া ফিল্টার লক করা হয়েছে...`
       ]);
 
-      // Call Express server endpoint
-      const response = await fetch('/api/audio-presentation/analyze-and-match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioData: audioBase64,
-          mimeType: customAudioFile?.type || 'audio/mp3',
-          title: songTitle,
-          artist: artistName,
-          duration: audioDuration,
-          aspectRatio,
-          stylePreference: visualStyle,
-          performanceStyle,
-          lyricsInput
-        })
+      // Call universal presentation engine with multi-tier fallback (never throws Unexpected token '<')
+      const projectPlan = await requestAudioPresentationPlan({
+        audioData: audioBase64,
+        mimeType: customAudioFile?.type || 'audio/mp3',
+        title: songTitle,
+        artist: artistName,
+        duration: audioDuration,
+        aspectRatio,
+        stylePreference: visualStyle,
+        performanceStyle,
+        performerGender: performerGender === 'auto' ? undefined : performerGender,
+        performerVisualType,
+        lyricsInput
       });
 
-      const data = await response.json();
-
       // Stage 3 & 4: Scene Matching
-      await new Promise(r => setTimeout(r, deepThinkingMode ? 7000 : 3000));
+      await new Promise(r => setTimeout(r, deepThinkingMode ? 4000 : 1800));
       setCurrentStageIndex(3);
       setGenerationProgress(80);
       setReasoningLogs(prev => [
@@ -632,7 +652,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         `[Camera Motion] Ken Burns প্যান ও জুম ট্রানজিশন কোরিওগ্রাফ করা হয়েছে...`
       ]);
 
-      await new Promise(r => setTimeout(r, deepThinkingMode ? 5000 : 2000));
+      await new Promise(r => setTimeout(r, deepThinkingMode ? 3000 : 1200));
       setCurrentStageIndex(4);
       setGenerationProgress(98);
       setReasoningLogs(prev => [
@@ -642,15 +662,15 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
         `[Presentation Assembly] ফুল ভিডিও প্রেজেন্টেশন রেন্ডার সফল!`
       ]);
 
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 600));
 
-      if (data.success && data.project) {
-        if (data.project.performanceStyle) {
-          setPerformanceStyle(data.project.performanceStyle as PerformanceStyle);
+      if (projectPlan && Array.isArray(projectPlan.scenes) && projectPlan.scenes.length > 0) {
+        if (projectPlan.performanceStyle) {
+          setPerformanceStyle(projectPlan.performanceStyle as PerformanceStyle);
         }
 
         const genProject: AudioPresentationProject = {
-          ...data.project,
+          ...projectPlan,
           audioUrl: activeAudioSrc,
           duration: audioDuration
         };
@@ -698,7 +718,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
           audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
         }
       } else {
-        throw new Error(data.error || 'Failed to generate presentation plan');
+        throw new Error('প্রেজেন্টেশন পরিকল্পনা তৈরি করা যায়নি। পুনরায় চেষ্টা করুন।');
       }
     } catch (err: any) {
       console.error('Generation error:', err);
@@ -1122,39 +1142,112 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
 
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 {isBn
-                  ? 'গানের লিরিক্স ও ছন্দের সাথে এআই চরিত্র লিপ-সিঙ্ক, হাতের অঙ্গভঙ্গি ও নাচ করে অভিনয় করবে। প্রতিটি গানের স্টাইল আলাদা হবে।'
-                  : 'AI character acts, gestures, and lip-syncs dynamically to the lyrics and beat. Each style has unique stage and choreography.'}
+                  ? 'গানের কথার সাথে মিলিয়ে কাটুনের বদলে বাস্তব মানুষ অভিনয় করবে। কণ্ঠশিল্পী ছেলে না মেয়ে তা নির্ধারণ করুন এবং সঠিক পরিবেশ তৈরি করুন।'
+                  : 'Realistic human actors perform, lip-sync, and act in sync with the song lyrics instead of cartoons.'}
               </p>
 
-              {/* Performance Styles Grid */}
-              <div className="grid grid-cols-2 gap-2">
-                {PERFORMANCE_STYLES.map((style) => {
-                  const isSelected = performanceStyle === style.id;
-                  return (
-                    <button
-                      key={style.id}
-                      onClick={() => setPerformanceStyle(style.id)}
-                      className={`text-left p-2.5 rounded-xl border transition text-xs flex flex-col justify-between ${
-                        isSelected
-                          ? 'bg-gradient-to-br from-pink-950/60 to-purple-950/60 border-pink-500 text-white shadow-md shadow-pink-500/10'
-                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-400'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-base">{style.icon}</span>
-                        {isSelected && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
-                        )}
-                      </div>
-                      <div className="font-bold text-[11px] mt-1 text-slate-200">
-                        {isBn ? style.nameBn : style.nameEn}
-                      </div>
-                      <div className="text-[9px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
-                        {isBn ? style.descriptionBn : style.nameEn}
-                      </div>
-                    </button>
-                  );
-                })}
+              {/* 1. Singer & Actor Vocal Gender (কণ্ঠশিল্পী ও অভিনয়শিল্পীর লিঙ্গ) */}
+              <div className="space-y-1.5 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                  <span>{isBn ? '🎙️ কণ্ঠশিল্পী ও অভিনয়শিল্পীর লিঙ্গ:' : '🎙️ Vocal & Performer Gender:'}</span>
+                  <span className="text-[10px] text-pink-400 font-normal">
+                    {performerGender === 'female' ? (isBn ? 'মহিলা শিল্পী' : 'Female') : performerGender === 'male' ? (isBn ? 'পুরুষ শিল্পী' : 'Male') : performerGender === 'duet' ? (isBn ? 'ডুয়েট' : 'Duet') : (isBn ? 'অটো' : 'Auto')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { id: 'auto', labelBn: '✨ অটো', labelEn: '✨ Auto', icon: '✨' },
+                    { id: 'female', labelBn: '👩 মহিলা', labelEn: '👩 Female', icon: '👩' },
+                    { id: 'male', labelBn: '👨 পুরুষ', labelEn: '👨 Male', icon: '👨' },
+                    { id: 'duet', labelBn: '👫 ডুয়েট', labelEn: '👫 Duet', icon: '👫' },
+                  ].map((g) => {
+                    const isSelected = performerGender === g.id;
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setPerformerGender(g.id as any)}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition flex flex-col items-center justify-center gap-0.5 ${
+                          isSelected
+                            ? 'bg-pink-950/80 border-pink-500 text-pink-200 shadow-sm shadow-pink-500/20'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span className="text-sm">{g.icon}</span>
+                        <span className="text-[10px]">{isBn ? g.labelBn : g.labelEn}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Visual Mode (ভিজ্যুয়াল উপস্থাপনা মোড) */}
+              <div className="space-y-1.5 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div className="text-[11px] font-bold text-slate-300">
+                  {isBn ? '🎬 ভিজ্যুয়াল উপস্থাপনা মোড:' : '🎬 Visual Presentation Mode:'}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'realistic_human', nameBn: '👤 বাস্তব অভিনয়', descBn: 'আসল মানুষ অভিনয়', nameEn: '👤 Human Actor' },
+                    { id: 'cinematic_story', nameBn: '🎬 পূর্ণ দৃশ্যপট', descBn: '১০০% লিরিক্স দৃশ্য', nameEn: '🎬 Full Story' },
+                    { id: 'hybrid', nameBn: '🎭 ফিউশন কাট', descBn: 'অভিনয় ও গল্প কাট', nameEn: '🎭 Hybrid Cut' },
+                  ].map((mode) => {
+                    const isSelected = performerVisualType === mode.id;
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setPerformerVisualType(mode.id as PerformerVisualType)}
+                        className={`p-2 rounded-lg text-left border transition ${
+                          isSelected
+                            ? 'bg-purple-950/80 border-purple-500 text-white shadow-sm shadow-purple-500/20'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="text-[11px] font-bold">{isBn ? mode.nameBn : mode.nameEn}</div>
+                        <div className="text-[9px] text-slate-400 line-clamp-1 mt-0.5">
+                          {isBn ? mode.descBn : mode.nameEn}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Performance Archetype Styles Grid */}
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-bold text-slate-300">
+                  {isBn ? '🎭 গানের স্টাইল ও মঞ্চ সাজসজ্জা:' : '🎭 Performance Style & Stage Setup:'}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {PERFORMANCE_STYLES.map((style) => {
+                    const isSelected = performanceStyle === style.id;
+                    return (
+                      <button
+                        key={style.id}
+                        onClick={() => setPerformanceStyle(style.id)}
+                        className={`text-left p-2.5 rounded-xl border transition text-xs flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-gradient-to-br from-pink-950/60 to-purple-950/60 border-pink-500 text-white shadow-md shadow-pink-500/10'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-400'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-base">{style.icon}</span>
+                          {isSelected && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
+                          )}
+                        </div>
+                        <div className="font-bold text-[11px] mt-1 text-slate-200">
+                          {isBn ? style.nameBn : style.nameEn}
+                        </div>
+                        <div className="text-[9px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
+                          {isBn ? style.descriptionBn : style.nameEn}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -1355,6 +1448,7 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
                       </span>
                     )}
 
+                    {/* Actor On/Off Toggle */}
                     <button
                       onClick={() => setShowPerformer(!showPerformer)}
                       className={`pointer-events-auto px-2.5 py-1 rounded-full backdrop-blur-md border text-xs font-semibold flex items-center gap-1.5 shadow-lg transition cursor-pointer ${
@@ -1370,6 +1464,52 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
                         {isBn 
                           ? `${PERFORMANCE_STYLES.find(s => s.id === performanceStyle)?.nameBn || 'চরিত্র অভিনয়'}` 
                           : `${PERFORMANCE_STYLES.find(s => s.id === performanceStyle)?.nameEn || 'Actor'}`}
+                      </span>
+                    </button>
+
+                    {/* Performer Gender Quick Toggle */}
+                    <button
+                      onClick={() => {
+                        const nextG: Record<string, 'female' | 'male' | 'duet' | 'auto'> = {
+                          auto: 'female',
+                          female: 'male',
+                          male: 'duet',
+                          duet: 'auto'
+                        };
+                        setPerformerGender(nextG[performerGender] || 'auto');
+                      }}
+                      className="pointer-events-auto px-2.5 py-1 rounded-full backdrop-blur-md border border-white/10 bg-black/60 text-xs font-semibold flex items-center gap-1 shadow-lg transition hover:bg-black/80 text-white cursor-pointer"
+                      title={isBn ? 'কণ্ঠশিল্পী ও অভিনেতার লিঙ্গ পরিবর্তন' : 'Switch Singer Gender'}
+                    >
+                      <span>
+                        {performerGender === 'female' ? '👩' : performerGender === 'male' ? '👨' : performerGender === 'duet' ? '👫' : '✨'}
+                      </span>
+                      <span className="text-[11px]">
+                        {performerGender === 'female' ? (isBn ? 'মহিলা শিল্পী' : 'Female') : performerGender === 'male' ? (isBn ? 'পুরুষ শিল্পী' : 'Male') : performerGender === 'duet' ? (isBn ? 'ডুয়েট' : 'Duet') : (isBn ? 'অটো' : 'Auto')}
+                      </span>
+                    </button>
+
+                    {/* Visual Mode Quick Toggle */}
+                    <button
+                      onClick={() => {
+                        const nextM: Record<PerformerVisualType, PerformerVisualType> = {
+                          realistic_human: 'cinematic_story',
+                          cinematic_story: 'hybrid',
+                          hybrid: 'realistic_human'
+                        };
+                        setPerformerVisualType(nextM[performerVisualType]);
+                      }}
+                      className={`pointer-events-auto px-2.5 py-1 rounded-full backdrop-blur-md border text-xs font-semibold flex items-center gap-1 shadow-lg transition cursor-pointer ${
+                        performerVisualType === 'realistic_human'
+                          ? 'bg-pink-950/80 border-pink-500/50 text-pink-200'
+                          : performerVisualType === 'cinematic_story'
+                          ? 'bg-blue-950/80 border-blue-500/50 text-blue-200'
+                          : 'bg-purple-950/80 border-purple-500/50 text-purple-200'
+                      }`}
+                      title={isBn ? 'উপস্থাপনা মোড পরিবর্তন (বাস্তব মানুষ / পূর্ণ দৃশ্যপট / ফিউশন)' : 'Switch Visual Mode'}
+                    >
+                      <span className="text-[11px]">
+                        {performerVisualType === 'realistic_human' ? '👤 মানুষ অভিনয়' : performerVisualType === 'cinematic_story' ? '🎬 দৃশ্যপট' : '🎭 ফিউশন'}
                       </span>
                     </button>
                   </div>
@@ -1500,10 +1640,10 @@ export const AudioMusicPresentation: React.FC<AudioMusicPresentationProps> = ({
                           ? 'bg-pink-950/70 border-pink-500/50 text-pink-300'
                           : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
                       }`}
-                      title={isBn ? 'গানের সাথে চরিত্র অভিনয় চালু বা বন্ধ করুন' : 'Toggle Character Acting'}
+                      title={isBn ? 'গানের সাথে বাস্তব মানুষের অভিনয় চালু বা বন্ধ করুন' : 'Toggle Real Human Acting'}
                     >
                       <User className="w-3.5 h-3.5 text-pink-400" />
-                      <span>{isBn ? 'চরিত্র অভিনয়' : 'Actor'}</span>
+                      <span>{isBn ? 'বাস্তব অভিনয়' : 'Human Actor'}</span>
                       {showPerformer && (
                         <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
                       )}

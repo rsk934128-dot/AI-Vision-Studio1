@@ -28,7 +28,10 @@ import {
   Check,
   Subtitles,
   ExternalLink,
-  Info
+  Info,
+  Palette,
+  Zap,
+  Flame
 } from 'lucide-react';
 import { Language, VideoScriptScene, VideoJob } from '../types';
 import { useWatermark } from '../context/WatermarkContext';
@@ -108,6 +111,99 @@ export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isHoveringControls, setIsHoveringControls] = useState<boolean>(true);
   const [isApproved, setIsApproved] = useState<boolean>(false);
+
+  // Cinematic Color Grading LUTs & Magic VFX
+  const [colorLut, setColorLut] = useState<'normal' | 'veo_vibrant' | 'hdr_clean' | 'film_noir' | 'cyber_glow'>('veo_vibrant');
+  const [showMagicVfx, setShowMagicVfx] = useState<boolean>(true);
+  const magicCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Filter calculation for cinematic LUTs
+  const getFilterCss = () => {
+    switch (colorLut) {
+      case 'veo_vibrant':
+        return 'contrast(1.12) saturate(1.25) brightness(1.04) sepia(0.05)';
+      case 'hdr_clean':
+        return 'contrast(1.2) saturate(1.35) brightness(1.02)';
+      case 'film_noir':
+        return 'contrast(1.25) saturate(0.85) sepia(0.18) brightness(0.96)';
+      case 'cyber_glow':
+        return 'contrast(1.3) saturate(1.4) hue-rotate(15deg) brightness(1.05)';
+      default:
+        return 'none';
+    }
+  };
+
+  // Magic VFX Particle Animation (Sparkles & Mystical Smoke)
+  useEffect(() => {
+    if (!showMagicVfx) return;
+    const canvas = magicCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width || 320;
+    canvas.height = rect.height || 540;
+
+    const particles: Array<{
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      color: string;
+      alpha: number;
+      life: number;
+      maxLife: number;
+    }> = [];
+
+    for (let i = 0; i < 24; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.7,
+        vy: -0.5 - Math.random() * 0.8,
+        radius: 1 + Math.random() * 2.5,
+        color: Math.random() > 0.45 ? '#a855f7' : '#facc15',
+        alpha: 0.25 + Math.random() * 0.6,
+        life: Math.random() * 100,
+        maxLife: 100 + Math.random() * 80,
+      });
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life += 1;
+        if (p.life > p.maxLife || p.y < 0) {
+          p.x = Math.random() * canvas.width;
+          p.y = canvas.height + 10;
+          p.life = 0;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = Math.sin((p.life / p.maxLife) * Math.PI) * p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [showMagicVfx]);
 
   // Video-to-Video Comparison state
   const [compareMode, setCompareMode] = useState<'split-slider' | 'side-by-side' | 'stylized-only'>('split-slider');

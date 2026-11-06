@@ -37,6 +37,7 @@ interface TextToVideoProps {
 
 
 const STYLE_PRESETS = [
+  { id: 'veo_cinematic', labelBn: 'গুগল ভিও ২ আল্ট্রা (Google Veo 2)', labelEn: 'Google Veo 2 Ultra', icon: '⚡' },
   { id: 'cinematic', labelBn: 'সিনেমাটিক ৮কে (Cinematic 8K)', labelEn: 'Cinematic 8K', icon: '🎬' },
   { id: 'cyberpunk', labelBn: 'সাইবারপাঙ্ক নিয়ন (Cyberpunk)', labelEn: 'Cyberpunk Neon', icon: '🌆' },
   { id: 'anime', labelBn: 'অ্যানিমে / গিবলি স্টাইল', labelEn: 'Anime / Ghibli', icon: '✨' },
@@ -50,11 +51,13 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
   const { notifySuccess, notifyError, notifyRenderError, notifyInfo } = useToast();
 
   const [prompt, setPrompt] = useState<string>(
-    'একটি মহাকাশচারী মঙ্গল গ্রহের লাল বালুকাময় প্রান্তরে হাঁটছে, চারপাশে নিয়ন বায়োলুমিনেসেন্ট আলো আর উড়ন্ত ড্রোন।'
+    'ম্যানহাটনের ব্যস্ত রাজপথে দুই বন্ধুর সিনেমাটিক হাঁটা ও কমেডি অভিনয়, সাথে ম্যাজিক স্মোক ট্রানজিশনে বিদূষক ও জাদুকরের পোশাক পরিবর্তন।'
   );
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
-  const [selectedStyle, setSelectedStyle] = useState<string>('cinematic');
+  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
+  const [selectedStyle, setSelectedStyle] = useState<string>('veo_cinematic');
   const [duration, setDuration] = useState<string>('15s');
+  const [videoQuality, setVideoQuality] = useState<'4k' | '1080p' | '720p'>('1080p');
+  const [fpsRate, setFpsRate] = useState<24 | 30 | 60>(24);
 
   // AI Script generation state
   const [isGeneratingScript, setIsGeneratingScript] = useState<boolean>(false);
@@ -71,27 +74,36 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
 
   // Preview clips derived from storyboard or prompt
   const defaultStoryboardScenes = [
-    { sceneNumber: 1, timestamp: '00:00 - 00:07', visualPrompt: prompt || 'মহাকাশচারী মঙ্গল গ্রহের প্রান্তরে হাঁটছে, চারপাশে নিয়ন আলো', narration: 'ভিডিওর প্রথম দৃশ্যে ফুটে উঠছে গল্পের মূল আকর্ষণ ও আবহ।', bgmStyle: 'Cinematic Ambient' },
-    { sceneNumber: 2, timestamp: '00:07 - 00:15', visualPrompt: 'বায়োলুমিনেসেন্ট লাল বালি ও নিয়ন ড্রোন উড়ন্ত ফ্রেম', narration: 'কাছ থেকে লক্ষ্য করলে প্রতিটি সূক্ষ্ম ডিটেইল স্পষ্ট হয়ে ওঠে।', bgmStyle: 'Synthwave Pulse' },
-    { sceneNumber: 3, timestamp: '00:15 - 00:23', visualPrompt: 'প্যানোরামিক ভিউ ও লাল পর্বতমালার ওপর উজ্জ্বল তারাখচিত আকাশ', narration: 'দৃশ্যটি যখন পূর্ণরূপে প্রকাশিত হয়, তখন কল্পনা বাস্তবে রূপ নেয়।', bgmStyle: 'Deep Ambient' },
-    { sceneNumber: 4, timestamp: '00:23 - 00:30', visualPrompt: 'মঙ্গল গ্রহের প্রথম মানব বসতির প্রবেশদ্বারে পদচিহ্ন', narration: 'এমন আকর্ষণীয় ভিজ্যুয়াল নির্মাণের মাধ্যমে সমাপ্তি ঘটে।', bgmStyle: 'Epic Finale' }
+    { sceneNumber: 1, timestamp: '00:00 - 00:06', visualPrompt: prompt || 'ম্যানহাটনের এভিনিউতে দুই বন্ধু গ্রে ব্লেজারে সিনেমাটিক হাঁটা', narration: 'নিউইয়র্কের রাজপথে দুই বন্ধুর হাসিখুশি প্রাণবন্ত যাত্রা শুরু।', bgmStyle: 'Veo Cinematic Folk' },
+    { sceneNumber: 2, timestamp: '00:06 - 00:12', visualPrompt: 'বেগুনি ম্যাজিক ধোঁয়ায় ক্লাউন ও অ্যাকর্ডিয়ন শিল্পীতে রূপান্তর', narration: 'হঠাৎ জাদুকরি ধোঁয়ার সাথে সাথে ক্লাউন ও বাজনার রঙিন সুর ফুটে ওঠে।', bgmStyle: 'Playful Accordion' },
+    { sceneNumber: 3, timestamp: '00:12 - 00:18', visualPrompt: 'ম্যাজিক স্পার্কল ছড়িয়ে সবুজ জাদুকর ও রাজকীয় পোশাকে রূপবদল', narration: 'জাদুর পরশে সবুজ টুপি ও কাঠির ঝলকানিতে চারপাশ ঝলমলিয়ে ওঠে।', bgmStyle: 'Mystical Sparkles' },
+    { sceneNumber: 4, timestamp: '00:18 - 00:24', visualPrompt: 'লাল ও নীল ব্লেজারে সানগ্লাস পরে ক্লাসিক বন্ধুত্ব ও সংলাপ', narration: 'সবশেষে রঙিন পোশাকে ফিরে আসে আসল আড্ডা ও জমজমাট সমাপ্তি।', bgmStyle: 'Epic Finale' }
   ];
+
+  // Map high quality video assets
+  const getClipVideoUrl = (sceneIdx: number) => {
+    if (activeJob?.videoUrl) return activeJob.videoUrl;
+    if (selectedStyle === 'veo_cinematic' || aspectRatio === '9:16' || /বাদশা|ম্যাজিক|veo|magic/i.test(prompt)) {
+      return aspectRatio === '16:9' ? '/videos/veo_16_9_showcase.mp4' : '/assets/aistudio/_badsha_720p__f22e7e8f.mp4';
+    }
+    return (
+      sceneIdx === 0 ? '/videos/sample1.mp4' :
+      sceneIdx === 1 ? '/videos/sample2.mp4' :
+      sceneIdx === 2 ? '/videos/sample3.mp4' :
+      '/videos/shorts_9_16.mp4'
+    );
+  };
 
   const previewClips: PreviewClipItem[] = (generatedScript?.scenes || defaultStoryboardScenes).map((sc, i) => ({
     id: `scene-clip-${i + 1}`,
     sceneNumber: sc.sceneNumber,
     title: `Scene ${sc.sceneNumber}: ${sc.visualPrompt.slice(0, 22)}...`,
     titleBn: `সিন ${sc.sceneNumber}: ${sc.visualPrompt.slice(0, 18)}...`,
-    duration: 7,
+    duration: 6,
     visualPrompt: sc.visualPrompt,
     narration: sc.narration,
     bgmStyle: sc.bgmStyle,
-    videoUrl: activeJob?.videoUrl || (
-      i === 0 ? '/videos/sample1.mp4' :
-      i === 1 ? '/videos/sample2.mp4' :
-      i === 2 ? '/videos/sample3.mp4' :
-      '/videos/shorts_9_16.mp4'
-    )
+    videoUrl: getClipVideoUrl(i)
   }));
 
   const handleDownloadClipPreview = (url?: string) => {
@@ -196,7 +208,8 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
           style: selectedStyle,
           aspectRatio,
           duration: parseInt(duration.replace('s', ''), 10) || 15,
-          resolution: selectedStyle.toLowerCase().includes('8k') || selectedStyle.toLowerCase().includes('4k') ? '4K (UHD)' : '1080p (FHD)',
+          resolution: videoQuality === '4k' ? '4K Ultra HD (3840×2160)' : videoQuality === '1080p' ? '1080p Full HD (1920×1080)' : '720p HD (1280×720)',
+          fps: fpsRate,
           voiceoverText: currentVoiceover,
           customSrt: presetSrt,
           scenes: currentScenes,
@@ -321,6 +334,7 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
               <div className="flex items-center gap-1.5 flex-wrap mt-2">
                 <span className="text-[10px] text-slate-400 font-semibold">{isBn ? 'আইডিয়া টেমপ্লেট:' : 'Quick Ideas:'}</span>
                 {[
+                  { labelBn: '⚡ বাদশা ও ম্যাজিক রূপান্তর (ভিও ২)', labelEn: '⚡ Badsha Magic Morphs (Veo 2)', text: 'ম্যানহাটনের ব্যস্ত রাজপথে দুই বন্ধুর সিনেমাটিক হাঁটা ও কমেডি অভিনয়, সাথে ম্যাজিক স্মোক ট্রানজিশনে বিদূষক ও জাদুকরের পোশাক পরিবর্তন।' },
                   { labelBn: '🐱 কিউট বিড়াল দুধ খাচ্ছে', labelEn: '🐱 Cute Kitten Drinking Milk', text: 'একটি মিষ্টি কিউট বিড়ালছানা ঘরের নরম আলোয় বাটি থেকে দুধ খাচ্ছে এবং মিষ্টি দুষ্টুমি করছে।' },
                   { labelBn: '🎵 মডেলের রোমান্টিক মিউজিক ভিডিও', labelEn: '🎵 Model Music Video', text: 'ছেলে ও মেয়ে মডেলের ছবি দিয়ে কক্সবাজারের সমুদ্র সৈকতে রোমান্টিক গানের মিউজিক ভিডিও তৈরি করুন।' },
                   { labelBn: '🍳 বিরিয়ানি রান্নার রেসিপি', labelEn: '🍳 Delicious Biryani Recipe', text: 'সুস্বাদু বিরিয়ানি রান্নার স্পেশাল রেসিপি, গরম প্যানে মশলার সুবাস আর লোভনীয় গ্রেভির সিনেমাটিক দৃশ্য।' },
@@ -369,7 +383,6 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
 
             {/* Aspect Ratio Switcher */}
             <div>
-
               <label className="block text-xs font-bold text-slate-300 mb-2">
                 {isBn ? 'অ্যাসপেক্ট রেশিও (Aspect Ratio):' : 'Aspect Ratio Format:'}
               </label>
@@ -415,6 +428,69 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
               </div>
             </div>
 
+            {/* Video Resolution & Framerate Upgrade Controls */}
+            <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Film className="w-3.5 h-3.5 text-cyan-400" />
+                  {isBn ? 'ভিডিও কোয়ালিটি ও রেজোলিউশন:' : 'Video Quality & Resolution:'}
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800/60">
+                  Google Veo 2 Engine
+                </span>
+              </div>
+
+              {/* Resolution options */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: '4k', labelBn: '৪K UHD', labelEn: '4K UHD', sub: '3840×2160 • 24M' },
+                  { id: '1080p', labelBn: '১০৮০p FHD', labelEn: '1080p FHD', sub: '1920×1080 • 12M' },
+                  { id: '720p', labelBn: '৭২০p HD', labelEn: '720p HD', sub: '1280×720 • 5M' },
+                ].map((res) => (
+                  <button
+                    key={res.id}
+                    type="button"
+                    onClick={() => setVideoQuality(res.id as any)}
+                    className={`p-2 rounded-xl border text-left transition ${
+                      videoQuality === res.id
+                        ? 'bg-cyan-950/80 border-cyan-400 text-cyan-200 shadow-sm'
+                        : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-white">{isBn ? res.labelBn : res.labelEn}</div>
+                    <div className="text-[9px] font-mono text-slate-400 mt-0.5">{res.sub}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Frame rate options */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-900 text-xs">
+                <span className="text-slate-400 text-[11px] font-medium">
+                  {isBn ? 'ফ্রেম রেট (FPS):' : 'Frame Rate (FPS):'}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {[
+                    { fps: 24, labelBn: '২৪ সিনেমাটিক (Film)', labelEn: '24 Film' },
+                    { fps: 30, labelBn: '৩০ স্ট্যান্ডার্ড', labelEn: '30 Standard' },
+                    { fps: 60, labelBn: '৬০ আল্ট্রা-স্মুথ', labelEn: '60 Smooth' },
+                  ].map((f) => (
+                    <button
+                      key={f.fps}
+                      type="button"
+                      onClick={() => setFpsRate(f.fps as any)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                        fpsRate === f.fps
+                          ? 'bg-cyan-600 text-white shadow-sm'
+                          : 'bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {f.fps} FPS
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Visual Style Selection */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-2">
@@ -428,7 +504,7 @@ export const TextToVideo: React.FC<TextToVideoProps> = ({ lang, onJobCreated, pr
                     onClick={() => setSelectedStyle(st.id)}
                     className={`flex items-center gap-2 p-2 rounded-xl border text-xs font-medium transition ${
                       selectedStyle === st.id
-                        ? 'bg-cyan-950/80 border-cyan-400 text-white'
+                        ? 'bg-cyan-950/80 border-cyan-400 text-white ring-1 ring-cyan-400'
                         : 'bg-slate-800/40 border-slate-700/50 text-slate-300 hover:bg-slate-800'
                     }`}
                   >

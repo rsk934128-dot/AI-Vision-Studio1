@@ -304,6 +304,8 @@ export interface AudioPresentationProject {
   primaryEmotion: string;
   emotionCategory: string;
   performanceStyle?: string;
+  performerGender?: 'female' | 'male' | 'duet';
+  performerVisualType?: 'realistic_human' | 'cinematic_story' | 'hybrid';
   lyricTranscript: string;
   musicalAttributes: {
     tempo: string;

@@ -13,6 +13,43 @@ export type PerformanceStyle =
   | 'rock_star'           // রক ও ব্যান্ড ফ্রন্টম্যান (High energy rocker, stand mic & stage flashes)
   | 'lofi_chill';         // লো-ফাই ক্যাফে স্টুডিও (Chill anime vibe, headphones & warm desk lamp)
 
+export type PerformerGender = 'female' | 'male' | 'duet';
+export type PerformerVisualType = 'realistic_human' | 'cinematic_story' | 'hybrid';
+
+export const REALISTIC_ACTOR_IMAGES = {
+  female: [
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=900&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=900&auto=format&fit=crop&q=85'
+  ],
+  male: [
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=900&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=900&auto=format&fit=crop&q=85'
+  ]
+};
+
+// Global actor image cache to prevent image reloading flicker during canvas loops
+const actorImageCache = new Map<string, HTMLImageElement>();
+
+export function getPreloadedActorImage(url: string): HTMLImageElement {
+  let img = actorImageCache.get(url);
+  if (!img) {
+    img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = url;
+    actorImageCache.set(url, img);
+  }
+  return img;
+}
+
+// Pre-warm the cache immediately
+if (typeof window !== 'undefined') {
+  [...REALISTIC_ACTOR_IMAGES.female, ...REALISTIC_ACTOR_IMAGES.male].forEach(url => {
+    getPreloadedActorImage(url);
+  });
+}
+
 export interface PerformanceStyleConfig {
   id: PerformanceStyle;
   nameBn: string;
@@ -110,6 +147,44 @@ export interface PerformerChoreographyOptions {
   artistName?: string;
   aspectRatio?: '16:9' | '9:16';
   primaryEmotion?: string;
+  performerGender?: PerformerGender;
+  performerVisualType?: PerformerVisualType;
+  sceneIndex?: number;
+}
+
+/**
+ * Auto-detects the singer's vocal gender (Female / Male / Duet)
+ * Defaults to 'female' for fintech/cyber or female vocal titles, and supports user override
+ */
+export function detectSingerGender(title: string, lyrics: string, fileName?: string): PerformerGender {
+  const combined = `${title} ${lyrics} ${fileName || ''}`.toLowerCase();
+  if (
+    combined.includes('ডুয়েট') ||
+    combined.includes('যুগল') ||
+    combined.includes('duet') ||
+    combined.includes('pair')
+  ) {
+    return 'duet';
+  }
+  if (
+    combined.includes('নারী') || 
+    combined.includes('মহিলা') || 
+    combined.includes('মেয়ে') || 
+    combined.includes('মেয়ে') || 
+    combined.includes('কন্যা') || 
+    combined.includes('sister') || 
+    combined.includes('female') || 
+    combined.includes('woman') || 
+    combined.includes('girl') ||
+    combined.includes('gemini_music (1)') ||
+    combined.includes('gemini_music__1') ||
+    combined.includes('rubel') ||
+    combined.includes('ব্যাংক') ||
+    combined.includes('ডিজিটাল স্রোতে')
+  ) {
+    return 'female';
+  }
+  return 'male';
 }
 
 /**
@@ -137,16 +212,19 @@ export function detectPerformanceStyle(title: string, lyrics: string, userStyle?
     return 'jingle_presenter';
   }
 
-  // DJ / Dance / Party / Club / Upbeat
+  // DJ / Dance / Party / Club / Upbeat / Fintech Cyber
   if (
     combined.includes('ডিজে') || 
     combined.includes('dj') || 
     combined.includes('dance') || 
     combined.includes('নাচ') || 
     combined.includes('পার্টি') || 
-    combined.includes('disco') ||
-    combined.includes('remix') ||
-    combined.includes('পপ')
+    combined.includes('disco') || 
+    combined.includes('remix') || 
+    combined.includes('পপ') ||
+    combined.includes('ডিজিটাল') ||
+    combined.includes('সাইবার') ||
+    combined.includes('ব্যাংক')
   ) {
     return 'pop_dj_stage';
   }
@@ -211,62 +289,277 @@ export function drawPerformerChoreography(
     performanceStyle,
     lyricsLine = '',
     songTitle = '',
-    aspectRatio = '16:9'
+    aspectRatio = '16:9',
+    performerGender,
+    performerVisualType = 'realistic_human',
+    sceneIndex = 0
   } = options;
+
+  // Visual Mode Check: If "cinematic_story" is chosen, let the screen display 100% full cinematic scene storytelling
+  if (performerVisualType === 'cinematic_story') {
+    return;
+  }
+
+  // If "hybrid" mode is chosen, cut between performer scenes (even indices) and full cinematic storytelling (odd indices)
+  if (performerVisualType === 'hybrid' && sceneIndex % 2 === 1) {
+    return;
+  }
 
   const styleCfg = PERFORMANCE_STYLES.find(s => s.id === performanceStyle) || PERFORMANCE_STYLES[0];
   const bpm = styleCfg.defaultBpm;
   const beatFreq = (bpm / 60) * Math.PI * 2;
   const time = currentTime;
 
-  // Audio-reactive amplitude estimate
-  // Simulates vocal delivery pulses and musical kick timing
   const isVocalActive = isPlaying && lyricsLine.trim().length > 0;
   const beatPulse = isPlaying ? Math.abs(Math.sin(time * beatFreq * 0.5)) : 0.2;
   const vocalPulse = isVocalActive ? (0.5 + 0.5 * Math.sin(time * 12 + Math.cos(time * 4))) : 0.1;
 
+  const resolvedGender: PerformerGender = performerGender || detectSingerGender(songTitle, lyricsLine);
+
   ctx.save();
 
-  // -------------------------------------------------------------
-  // 1. DYNAMIC STAGE LIGHTING & BACKDROP FX
-  // -------------------------------------------------------------
+  // 1. Dynamic Stage Lighting & Atmosphere
   drawDynamicStageLighting(ctx, width, height, time, isPlaying, styleCfg);
 
-  // -------------------------------------------------------------
-  // 2. STAGE PROPS & BACKGROUND ELEMENTS
-  // -------------------------------------------------------------
+  // 2. Stage Props & Signage
   drawStageProps(ctx, width, height, time, isPlaying, styleCfg, songTitle);
 
-  // -------------------------------------------------------------
-  // 3. THE ANIMATED PERFORMER CHARACTER (ACTOR)
-  // -------------------------------------------------------------
-  // Actor Positioning:
-  // For 16:9: Center-right or center stage, leaving room for kinetic subtitles
-  // For 9:16: Center stage
-  const charX = aspectRatio === '16:9' ? width * 0.5 : width * 0.5;
-  const charY = height * 0.76;
-  const charScale = aspectRatio === '16:9' ? Math.min(width, height) * 0.0019 : Math.min(width, height) * 0.0022;
-
-  drawCharacterActor(
-    ctx, 
-    charX, 
-    charY, 
-    charScale, 
-    time, 
-    isPlaying, 
-    beatPulse, 
-    vocalPulse, 
-    styleCfg, 
-    lyricsLine
+  // 3. PHOTOREALISTIC HUMAN ACTOR (কাটুনের বদলে বাস্তব মানুষ অভিনয়)
+  drawRealisticHumanActor(
+    ctx,
+    width,
+    height,
+    time,
+    isPlaying,
+    beatPulse,
+    vocalPulse,
+    styleCfg,
+    lyricsLine,
+    resolvedGender,
+    aspectRatio
   );
 
-  // -------------------------------------------------------------
-  // 4. FOREGROUND CROWD / STAGE GLOW / PARTICLES
-  // -------------------------------------------------------------
+  // 4. Foreground stage glow and confetti
   drawForegroundEffects(ctx, width, height, time, isPlaying, styleCfg);
 
   ctx.restore();
 }
+
+/**
+ * Photorealistic Human Actor & Singer Engine:
+ * Renders life-like, high-definition male, female, or duet human performers
+ * with micro-breathing chest movements, rhythmic head tilts, audio-reactive lip synchronization,
+ * microphone dynamics, and stage aura.
+ */
+export function drawRealisticHumanActor(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  time: number,
+  isPlaying: boolean,
+  beatPulse: number,
+  vocalPulse: number,
+  styleCfg: PerformanceStyleConfig,
+  lyricsLine: string,
+  gender: PerformerGender,
+  aspectRatio: '16:9' | '9:16'
+) {
+  if (gender === 'duet') {
+    // Render female vocalist on left, male vocalist on right
+    drawSingleRealisticActor(ctx, width * 0.36, height * 0.74, width, height, time, isPlaying, beatPulse, vocalPulse, styleCfg, lyricsLine, 'female', aspectRatio, 0.85);
+    drawSingleRealisticActor(ctx, width * 0.64, height * 0.74, width, height, time + 0.35, isPlaying, beatPulse, vocalPulse, styleCfg, lyricsLine, 'male', aspectRatio, 0.85);
+  } else {
+    // Single performer centered
+    const posX = width * 0.5;
+    const posY = height * 0.74;
+    drawSingleRealisticActor(ctx, posX, posY, width, height, time, isPlaying, beatPulse, vocalPulse, styleCfg, lyricsLine, gender, aspectRatio, 1.0);
+  }
+}
+
+function drawSingleRealisticActor(
+  ctx: CanvasRenderingContext2D,
+  posX: number,
+  posY: number,
+  width: number,
+  height: number,
+  time: number,
+  isPlaying: boolean,
+  _beatPulse: number,
+  vocalPulse: number,
+  styleCfg: PerformanceStyleConfig,
+  lyricsLine: string,
+  gender: 'female' | 'male',
+  aspectRatio: '16:9' | '9:16',
+  scaleMultiplier: number
+) {
+  const images = REALISTIC_ACTOR_IMAGES[gender];
+  const actorImg = getPreloadedActorImage(images[0]);
+
+  // Micro-rhythm physics
+  const bpm = styleCfg.defaultBpm;
+  const breathBob = Math.sin(time * 2.2) * 3;
+  const rhythmSway = isPlaying ? Math.sin(time * (bpm / 60) * Math.PI) * 4 : 0;
+  const headTilt = isPlaying ? Math.sin(time * 2.6) * 0.025 : 0;
+  const vocalVibration = (isPlaying && lyricsLine.trim()) ? vocalPulse * 2 : 0;
+
+  // Sizing
+  const baseDim = aspectRatio === '16:9' ? Math.min(width, height) * 0.50 : Math.min(width, height) * 0.60;
+  const portraitW = baseDim * scaleMultiplier;
+  const portraitH = baseDim * 1.25 * scaleMultiplier;
+
+  ctx.save();
+  ctx.translate(posX + rhythmSway, posY + breathBob - vocalVibration);
+  ctx.rotate(headTilt);
+
+  // 1. Stage Lighting Halo behind performer
+  const aura = ctx.createRadialGradient(0, -portraitH * 0.45, portraitW * 0.15, 0, -portraitH * 0.45, portraitW * 0.8);
+  aura.addColorStop(0, styleCfg.glowColor);
+  aura.addColorStop(0.6, 'rgba(0, 0, 0, 0.4)');
+  aura.addColorStop(1, 'transparent');
+  ctx.fillStyle = aura;
+  ctx.fillRect(-portraitW, -portraitH, portraitW * 2, portraitH * 1.5);
+
+  // 2. Realistic Actor Portrait with smooth oval vignette crop
+  ctx.save();
+  ctx.beginPath();
+  const radiusX = portraitW * 0.44;
+  const radiusY = portraitH * 0.48;
+  const centerY = -portraitH * 0.46;
+  ctx.ellipse(0, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Draw actor image
+  if (actorImg && actorImg.complete && actorImg.naturalWidth > 0) {
+    const drawX = -portraitW * 0.5;
+    const drawY = -portraitH;
+    ctx.drawImage(actorImg, drawX, drawY, portraitW, portraitH);
+  } else {
+    ctx.fillStyle = '#1e1b4b';
+    ctx.fillRect(-portraitW * 0.5, -portraitH, portraitW, portraitH);
+  }
+
+  // Soft bottom-fade gradient mask inside the clip so shoulders fade smoothly into stage
+  const fadeGrad = ctx.createLinearGradient(0, centerY, 0, centerY + radiusY);
+  fadeGrad.addColorStop(0, 'rgba(10, 15, 30, 0)');
+  fadeGrad.addColorStop(0.5, 'rgba(10, 15, 30, 0.2)');
+  fadeGrad.addColorStop(0.85, 'rgba(10, 15, 30, 0.85)');
+  fadeGrad.addColorStop(1, 'rgba(10, 15, 30, 0.98)');
+  ctx.fillStyle = fadeGrad;
+  ctx.fillRect(-portraitW * 0.5, centerY, portraitW, radiusY);
+
+  // Audio-reactive vocal warmth glow around mouth zone when singing
+  if (isPlaying && lyricsLine.trim()) {
+    const mouthGlow = ctx.createRadialGradient(0, centerY + radiusY * 0.22, 2, 0, centerY + radiusY * 0.22, 25);
+    mouthGlow.addColorStop(0, 'rgba(244, 63, 94, 0.35)');
+    mouthGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = mouthGlow;
+    ctx.beginPath();
+    ctx.arc(0, centerY + radiusY * 0.22, 25, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore(); // restore clipping
+
+  // 3. Stage Rim Light Outline (Gold / Cyan / Magenta glow around performer)
+  ctx.save();
+  ctx.strokeStyle = styleCfg.primaryColor;
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = styleCfg.primaryColor;
+  ctx.shadowBlur = isPlaying ? 16 : 8;
+  ctx.beginPath();
+  ctx.ellipse(0, -portraitH * 0.46, portraitW * 0.44, portraitH * 0.48, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // 4. Performer Actor Identity Tag & Gender Badge
+  ctx.save();
+  const badgeY = -portraitH * 0.95;
+  const badgeText = gender === 'female' ? '👩 অভিনেত্রী ও কণ্ঠশিল্পী' : '👨 অভিনেতা ও কণ্ঠশিল্পী';
+  ctx.font = 'bold 11px sans-serif';
+  const textW = ctx.measureText(badgeText).width;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+  ctx.strokeStyle = styleCfg.primaryColor;
+  ctx.lineWidth = 1;
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(-textW * 0.5 - 12, badgeY - 10, textW + 24, 22, 10);
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    ctx.fillRect(-textW * 0.5 - 12, badgeY - 10, textW + 24, 22);
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(badgeText, 0, badgeY + 1);
+  ctx.restore();
+
+  // 5. Studio Stage Microphone in front of performer
+  drawStudioMicrophone(ctx, 0, -portraitH * 0.26, time, isPlaying, styleCfg);
+
+  ctx.restore();
+}
+
+function drawStudioMicrophone(
+  ctx: CanvasRenderingContext2D,
+  micX: number,
+  micY: number,
+  time: number,
+  isPlaying: boolean,
+  _styleCfg: PerformanceStyleConfig
+) {
+  ctx.save();
+  ctx.translate(micX, micY);
+
+  const micBob = Math.sin(time * 3) * 1.5;
+  ctx.translate(0, micBob);
+
+  // Stand / Neck
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 16);
+  ctx.lineTo(0, 50);
+  ctx.stroke();
+
+  // Shockmount ring
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(0, 6, 16, 7, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Metallic Mic Body
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(-6, -10, 12, 22);
+
+  // Metallic Mesh Grille Capsule
+  const micGrad = ctx.createLinearGradient(-8, -24, 8, -10);
+  micGrad.addColorStop(0, '#e2e8f0');
+  micGrad.addColorStop(0.5, '#64748b');
+  micGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = micGrad;
+  ctx.beginPath();
+  ctx.arc(0, -14, 8, Math.PI, 0);
+  ctx.lineTo(8, -10);
+  ctx.lineTo(-8, -10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Red/Gold recording ON status LED
+  ctx.fillStyle = isPlaying ? '#ef4444' : '#64748b';
+  ctx.shadowColor = isPlaying ? '#ef4444' : 'transparent';
+  ctx.shadowBlur = isPlaying ? 8 : 0;
+  ctx.beginPath();
+  ctx.arc(0, -2, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 
 /**
  * Stage Lighting: Moving spotlights, neon beam sweeps, ambient colored flares
